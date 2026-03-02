@@ -40,6 +40,11 @@ metadata:
 ## 用法
 
 ```bash
+# 查看帮助
+python3 {baseDir}/scripts/health.py -h
+python3 {baseDir}/scripts/bt-config.py -h
+python3 {baseDir}/scripts/check_env.py -h
+
 # 检查所有服务器健康状态
 python3 {baseDir}/scripts/health.py
 
