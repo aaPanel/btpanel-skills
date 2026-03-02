@@ -12,10 +12,9 @@ MIN_PANEL_VERSION = "9.0.0"
 # API 端点定义
 # 格式: 端点路径?动作参数
 API_ENDPOINTS = {
-    # 系统状态
+    # 系统状态（综合接口，包含CPU、内存、磁盘、网络、负载等）
     "SYSTEM_STATUS": "/system?action=GetSystemTotal",
-    "SYSTEM_INFO": "/system?action=GetSystemTotal",
-    "NETWORK_INFO": "/system?action=GetNetWork",
+    "SYSTEM_NETWORK": "/system?action=GetNetWork",  # 综合监控数据接口
 
     # 日志相关
     "PANEL_LOGS": "/logs?action=GetLogs",
@@ -44,7 +43,7 @@ API_ENDPOINTS = {
 
 # API 端点分组
 API_GROUPS = {
-    "system": ["SYSTEM_STATUS", "SYSTEM_INFO", "NETWORK_INFO"],
+    "system": ["SYSTEM_STATUS", "SYSTEM_NETWORK"],
     "logs": ["PANEL_LOGS", "ERROR_LOGS", "SITE_LOGS"],
     "security": ["FIREWALL_STATUS", "SECURITY_LOGS", "SSH_INFO"],
     "service": ["SERVICE_LIST", "SERVICE_STATUS"],
@@ -55,9 +54,8 @@ API_GROUPS = {
 
 # 端点说明
 API_DESCRIPTIONS = {
-    "SYSTEM_STATUS": "获取系统状态（CPU、内存、磁盘）",
-    "SYSTEM_INFO": "获取系统信息",
-    "NETWORK_INFO": "获取网络信息",
+    "SYSTEM_STATUS": "获取系统状态（基础信息）",
+    "SYSTEM_NETWORK": "获取系统综合监控数据（CPU、内存、磁盘、网络、负载等）",
     "PANEL_LOGS": "获取面板操作日志",
     "ERROR_LOGS": "获取错误日志",
     "SITE_LOGS": "获取网站日志",

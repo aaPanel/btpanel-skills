@@ -88,9 +88,184 @@ def format_timestamp(ts: Optional[str] = None) -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def format_system_status(data: dict, server_name: str) -> dict:
+def parse_system_monitor_data(data: dict, server_name: str) -> dict:
     """
-    格式化系统状态响应
+    解析系统监控数据（GetNetWork接口返回）
+
+    Args:
+        data: 原始API响应
+        server_name: 服务器名称
+
+    Returns:
+        格式化后的系统监控数据
+    """
+    result = {
+        "server": server_name,
+        "timestamp": datetime.now().isoformat(),
+        "version": data.get("version", "unknown"),
+        "hostname": data.get("title", "unknown"),
+        "system": data.get("simple_system", data.get("system", "unknown")),
+        "uptime": data.get("time", "unknown"),
+        "docker_running": data.get("docker_run", False),
+    }
+
+    # 解析CPU数据
+    # cpu格式: [使用率%, 核心数, [用户态%, 系统态%], CPU型号, ?, ?]
+    cpu_data = data.get("cpu", [])
+    if isinstance(cpu_data, list) and len(cpu_data) >= 4:
+        result["cpu"] = {
+            "usage": round(cpu_data[0], 2) if isinstance(cpu_data[0], (int, float)) else 0,
+            "cores": cpu_data[1] if isinstance(cpu_data[1], int) else 1,
+            "user_usage": round(cpu_data[2][0], 2) if isinstance(cpu_data[2], list) and len(cpu_data[2]) > 0 else 0,
+            "system_usage": round(cpu_data[2][1], 2) if isinstance(cpu_data[2], list) and len(cpu_data[2]) > 1 else 0,
+            "model": cpu_data[3] if isinstance(cpu_data[3], str) else "Unknown",
+        }
+    else:
+        result["cpu"] = {"usage": 0, "cores": 1, "model": "Unknown"}
+
+    # 解析CPU时间分布
+    cpu_times = data.get("cpu_times", {})
+    if cpu_times:
+        result["cpu"]["times"] = {
+            "user": round(cpu_times.get("user", 0), 2),
+            "system": round(cpu_times.get("system", 0), 2),
+            "idle": round(cpu_times.get("idle", 0), 2),
+            "iowait": round(cpu_times.get("iowait", 0), 2),
+        }
+        # 进程数
+        result["processes"] = {
+            "total": cpu_times.get("总进程数", 0),
+            "active": cpu_times.get("活动进程数", 0),
+        }
+
+    # 解析负载
+    load_data = data.get("load", {})
+    if load_data:
+        result["load"] = {
+            "one_minute": round(load_data.get("one", 0), 2),
+            "five_minute": round(load_data.get("five", 0), 2),
+            "fifteen_minute": round(load_data.get("fifteen", 0), 2),
+            "cpu_count": load_data.get("max", 1),
+            "safe_limit": load_data.get("safe", 1),
+        }
+
+    # 解析内存数据 (单位: MB)
+    mem_data = data.get("mem", {})
+    if mem_data:
+        mem_total = mem_data.get("memTotal", 0)
+        mem_free = mem_data.get("memFree", 0)
+        mem_cached = mem_data.get("memCached", 0)
+        mem_buffers = mem_data.get("memBuffers", 0)
+        mem_available = mem_data.get("memAvailable", 0)
+        mem_used = mem_data.get("memRealUsed", mem_total - mem_free)
+
+        result["memory"] = {
+            "total_mb": mem_total,
+            "total_gb": round(mem_total / 1024, 2),
+            "used_mb": mem_used,
+            "used_gb": round(mem_used / 1024, 2),
+            "free_mb": mem_free,
+            "available_mb": mem_available,
+            "cached_mb": mem_cached,
+            "buffers_mb": mem_buffers,
+            "percent": round((mem_used / mem_total * 100), 2) if mem_total > 0 else 0,
+            "available_percent": round((mem_available / mem_total * 100), 2) if mem_total > 0 else 0,
+        }
+
+    # 解析磁盘数据
+    disk_list = data.get("disk", [])
+    disks = []
+    total_size = 0
+    total_used = 0
+
+    for disk in disk_list:
+        if isinstance(disk, dict):
+            byte_size = disk.get("byte_size", [0, 0, 0])
+            size_info = disk.get("size", ["0", "0", "0", "0%"])
+
+            disk_total = byte_size[0] if isinstance(byte_size, list) and len(byte_size) > 0 else 0
+            disk_used = byte_size[1] if isinstance(byte_size, list) and len(byte_size) > 1 else 0
+            disk_free = byte_size[2] if isinstance(byte_size, list) and len(byte_size) > 2 else 0
+
+            # 跳过挂载的远程存储（如ossfs）
+            filesystem = disk.get("filesystem", "")
+            if "fuse" in filesystem.lower() or "ossfs" in filesystem.lower():
+                continue
+
+            disk_entry = {
+                "path": disk.get("path", "/"),
+                "filesystem": filesystem,
+                "type": disk.get("type", "unknown"),
+                "total_bytes": disk_total,
+                "used_bytes": disk_used,
+                "free_bytes": disk_free,
+                "total_human": size_info[0] if len(size_info) > 0 else "0",
+                "used_human": size_info[1] if len(size_info) > 1 else "0",
+                "free_human": size_info[2] if len(size_info) > 2 else "0",
+                "percent": float(size_info[3].replace("%", "").strip()) if len(size_info) > 3 and isinstance(size_info[3], str) else 0,
+                "name": disk.get("rname", disk.get("path", "/")),
+            }
+            disks.append(disk_entry)
+            total_size += disk_total
+            total_used += disk_used
+
+    result["disk"] = {
+        "disks": disks,
+        "total_bytes": total_size,
+        "used_bytes": total_used,
+        "free_bytes": total_size - total_used,
+        "total_human": format_bytes(total_size),
+        "used_human": format_bytes(total_used),
+        "free_human": format_bytes(total_size - total_used),
+        "percent": round((total_used / total_size * 100), 2) if total_size > 0 else 0,
+    }
+
+    # 解析网络数据
+    result["network"] = {
+        "total_up": format_bytes(data.get("upTotal", 0)),
+        "total_down": format_bytes(data.get("downTotal", 0)),
+        "current_up": round(data.get("up", 0), 2),  # KB/s
+        "current_down": round(data.get("down", 0), 2),  # KB/s
+        "up_packets": data.get("upPackets", 0),
+        "down_packets": data.get("downPackets", 0),
+        "interfaces": {},
+    }
+
+    # 各网卡数据
+    network_ifaces = data.get("network", {})
+    for iface, stats in network_ifaces.items():
+        if isinstance(stats, dict):
+            result["network"]["interfaces"][iface] = {
+                "up_total": format_bytes(stats.get("upTotal", 0)),
+                "down_total": format_bytes(stats.get("downTotal", 0)),
+                "current_up": round(stats.get("up", 0), 2),
+                "current_down": round(stats.get("down", 0), 2),
+            }
+
+    # 资源统计
+    result["resources"] = {
+        "sites": data.get("site_total", 0),
+        "databases": data.get("database_total", 0),
+        "ftp_accounts": data.get("ftp_total", 0),
+    }
+
+    # IO统计
+    iostat = data.get("iostat", {})
+    if iostat and "ALL" in iostat:
+        all_io = iostat["ALL"]
+        result["io"] = {
+            "read_count": all_io.get("read_count", 0),
+            "write_count": all_io.get("write_count", 0),
+            "read_bytes": format_bytes(all_io.get("read_bytes", 0)),
+            "write_bytes": format_bytes(all_io.get("write_bytes", 0)),
+        }
+
+    return result
+
+
+def parse_system_status_legacy(data: dict, server_name: str) -> dict:
+    """
+    解析旧版系统状态响应（GetSystemTotal接口）
 
     Args:
         data: 原始API响应
@@ -147,7 +322,7 @@ def check_thresholds(metrics: dict, thresholds: dict) -> list[Alert]:
     检查阈值告警
 
     Args:
-        metrics: 格式化后的指标数据
+        metrics: 格式化后的指标数据（来自parse_system_monitor_data）
         thresholds: 阈值配置
 
     Returns:
@@ -159,7 +334,9 @@ def check_thresholds(metrics: dict, thresholds: dict) -> list[Alert]:
     memory_threshold = thresholds.get("memory", 85)
     disk_threshold = thresholds.get("disk", 90)
 
-    cpu_usage = metrics.get("cpu", {}).get("usage", 0)
+    # CPU告警
+    cpu_data = metrics.get("cpu", {})
+    cpu_usage = cpu_data.get("usage", 0)
     if cpu_usage >= cpu_threshold:
         alerts.append(
             Alert(
@@ -170,7 +347,9 @@ def check_thresholds(metrics: dict, thresholds: dict) -> list[Alert]:
             )
         )
 
-    mem_percent = metrics.get("memory", {}).get("percent", 0)
+    # 内存告警
+    mem_data = metrics.get("memory", {})
+    mem_percent = mem_data.get("percent", 0)
     if mem_percent >= memory_threshold:
         alerts.append(
             Alert(
@@ -178,10 +357,16 @@ def check_thresholds(metrics: dict, thresholds: dict) -> list[Alert]:
                 type="memory",
                 message=f"内存使用率过高: {mem_percent}% (阈值: {memory_threshold}%)",
                 value=mem_percent,
+                extra={
+                    "used_mb": mem_data.get("used_mb"),
+                    "total_mb": mem_data.get("total_mb"),
+                },
             )
         )
 
-    disk_percent = metrics.get("disk", {}).get("percent", 0)
+    # 磁盘告警
+    disk_data = metrics.get("disk", {})
+    disk_percent = disk_data.get("percent", 0)
     if disk_percent >= disk_threshold:
         alerts.append(
             Alert(
@@ -189,8 +374,42 @@ def check_thresholds(metrics: dict, thresholds: dict) -> list[Alert]:
                 type="disk",
                 message=f"磁盘使用率过高: {disk_percent}% (阈值: {disk_threshold}%)",
                 value=disk_percent,
+                extra={
+                    "used_human": disk_data.get("used_human"),
+                    "total_human": disk_data.get("total_human"),
+                },
             )
         )
+
+    # 检查各磁盘分区
+    for disk in disk_data.get("disks", []):
+        disk_p = disk.get("percent", 0)
+        if disk_p >= disk_threshold:
+            alerts.append(
+                Alert(
+                    level="critical" if disk_p >= 95 else "warning",
+                    type="disk",
+                    message=f"磁盘分区 {disk.get('path', '/')} 使用率过高: {disk_p}%",
+                    value=disk_p,
+                    extra={"path": disk.get("path")},
+                )
+            )
+
+    # 负载告警
+    load_data = metrics.get("load", {})
+    if load_data:
+        one_min_load = load_data.get("one_minute", 0)
+        cpu_count = load_data.get("cpu_count", 1)
+        # 负载超过CPU核心数时告警
+        if one_min_load >= cpu_count:
+            alerts.append(
+                Alert(
+                    level="warning",
+                    type="load",
+                    message=f"系统负载过高: {one_min_load} (CPU核心数: {cpu_count})",
+                    value=one_min_load,
+                )
+            )
 
     return alerts
 
@@ -369,15 +588,22 @@ def generate_summary_report(results: dict, report_type: str) -> str:
                 lines.append(f"\n[{name}] 连接失败: {server['error']}")
                 continue
 
-            metrics = server.get("metrics", {})
-            cpu = metrics.get("cpu", {})
-            memory = metrics.get("memory", {})
-            disk = metrics.get("disk", {})
+            # 新格式数据
+            cpu = server.get("cpu", {})
+            memory = server.get("memory", {})
+            disk = server.get("disk", {})
 
             lines.append(f"\n[{name}]")
-            lines.append(f"  CPU: {cpu.get('usage', 0):.1f}% ({cpu.get('cores', 1)}核)")
-            lines.append(f"  内存: {memory.get('percent', 0):.1f}% ({memory.get('used', 0):.1f}/{memory.get('total', 0):.1f} GB)")
-            lines.append(f"  磁盘: {disk.get('percent', 0):.1f}% ({disk.get('used', 0):.1f}/{disk.get('total', 0):.1f} GB)")
+            lines.append(f"  系统: {server.get('system', 'Unknown')} ({server.get('hostname', 'Unknown')})")
+            lines.append(f"  运行时间: {server.get('uptime', 'Unknown')}")
+            lines.append(f"  CPU: {cpu.get('usage', 0):.1f}% ({cpu.get('cores', 1)}核 - {cpu.get('model', 'Unknown')})")
+            lines.append(f"  内存: {memory.get('percent', 0):.1f}% ({memory.get('used_mb', 0)}/{memory.get('total_mb', 0)} MB)")
+            lines.append(f"  磁盘: {disk.get('percent', 0):.1f}% ({disk.get('used_human', '0')}/{disk.get('total_human', '0')})")
+
+            # 资源统计
+            resources = server.get("resources", {})
+            if resources:
+                lines.append(f"  资源: 网站{resources.get('sites', 0)}个, 数据库{resources.get('databases', 0)}个")
 
             alerts = server.get("alerts", [])
             if alerts:

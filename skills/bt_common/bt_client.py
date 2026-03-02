@@ -145,9 +145,15 @@ class BtClient:
         """获取系统状态"""
         return self.request(API_ENDPOINTS["SYSTEM_STATUS"])
 
-    def get_network_info(self) -> dict:
-        """获取网络信息"""
-        return self.request(API_ENDPOINTS["NETWORK_INFO"])
+    def get_system_monitor(self) -> dict:
+        """
+        获取系统综合监控数据
+        包含CPU、内存、磁盘、网络、负载、系统信息等
+
+        Returns:
+            原始监控数据
+        """
+        return self.request(API_ENDPOINTS["SYSTEM_NETWORK"])
 
     def get_service_list(self) -> list:
         """获取服务列表"""

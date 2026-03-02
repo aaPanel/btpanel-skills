@@ -25,7 +25,7 @@ from bt_common.utils import (
     Alert,
     check_thresholds,
     format_bytes,
-    format_system_status,
+    parse_system_status_legacy,
     format_uptime,
 )
 
@@ -300,8 +300,8 @@ class TestUtils:
         assert format_uptime(86400) == "1天0小时"
         assert format_uptime(90061) == "1天1小时"
 
-    def test_format_system_status(self):
-        """测试系统状态格式化"""
+    def test_parse_system_status_legacy(self):
+        """测试旧版系统状态解析"""
         data = {
             "cpu_usage": 50.5,
             "cpu_core": 4,
@@ -315,7 +315,7 @@ class TestUtils:
             "up_time": 86400,
         }
 
-        result = format_system_status(data, "test-server")
+        result = parse_system_status_legacy(data, "test-server")
 
         assert result["server"] == "test-server"
         assert "timestamp" in result
@@ -395,7 +395,7 @@ class TestAPIEndpoints:
     def test_endpoints_exist(self):
         """测试端点定义存在"""
         assert "SYSTEM_STATUS" in API_ENDPOINTS
-        assert "NETWORK_INFO" in API_ENDPOINTS
+        assert "SYSTEM_NETWORK" in API_ENDPOINTS
         assert "FIREWALL_STATUS" in API_ENDPOINTS
         assert "SSH_INFO" in API_ENDPOINTS
         assert "SERVICE_LIST" in API_ENDPOINTS
