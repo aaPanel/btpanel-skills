@@ -93,38 +93,6 @@ python3 {baseDir}/bt-health-check/scripts/health.py --format table
 - 数据库数量统计
 - 数据库大小统计
 
-## 输出示例
-
-```json
-{
-  "timestamp": "2024-01-15T10:30:00",
-  "servers": [
-    {
-      "server": "prod-01",
-      "services": {
-        "total": 5,
-        "running": 4,
-        "stopped": 1
-      },
-      "sites": {
-        "total": 10,
-        "running": 10,
-        "stopped": 0
-      },
-      "databases": {
-        "total": 3,
-        "sizeTotal": 1024.5
-      },
-      "overallStatus": "warning",
-      "alerts": [
-        {"level": "critical", "type": "service", "message": "关键服务 redis 已停止"}
-      ]
-    }
-  ],
-  "summary": {"total": 1, "healthy": 0, "warning": 1, "critical": 0}
-}
-```
-
 ## 健康状态
 
 | 状态 | 条件 | 说明 |
@@ -152,38 +120,9 @@ python3 {baseDir}/bt-health-check/scripts/health.py --format table
 | ≤ 7 天 | critical |
 | ≤ 30 天 | warning |
 
-## 数据说明
+## TODO
 
-### 返回字段
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| server | string | 服务器名称 |
-| services.total | number | 服务总数 |
-| services.running | number | 运行中服务数 |
-| services.stopped | number | 已停止服务数 |
-| sites.total | number | 网站总数 |
-| sites.running | number | 运行中网站数 |
-| databases.total | number | 数据库总数 |
-| databases.sizeTotal | number | 数据库总大小(MB) |
-| overallStatus | string | 整体状态 |
-| alerts | array | 告警列表 |
-
-### 告警字段
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| level | string | 告警级别 (warning/critical) |
-| type | string | 告警类型 (service/ssl) |
-| message | string | 告警信息 |
-| service | string | 相关服务名（可选） |
-| site | string | 相关网站名（可选） |
-
-## 错误处理
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| 未找到配置文件 | 未配置服务器 | 运行 bt-config.py init |
-| 服务列表为空 | API版本不兼容 | 确保面板版本 >= 9.0 |
-| 网站状态获取失败 | API权限不足 | 检查API Token权限 |
-| 数据库大小为0 | 面板未统计 | 手动刷新数据库统计 |
+- [ ] 通过实际服务器测试验证输出格式
+- [ ] 根据实际API返回数据优化输出结构
+- [ ] 完善数据字段文档
+- [ ] 验证SSL证书检查逻辑

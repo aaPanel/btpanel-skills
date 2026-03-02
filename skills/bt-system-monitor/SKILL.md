@@ -66,26 +66,6 @@ python3 {baseDir}/bt-system-monitor/scripts/monitor.py --output report.json
 | `--include-network`, `-n` | 包含网络信息 | false |
 | `--config`, `-c` | 配置文件路径 | 自动查找 |
 
-## 输出示例
-
-```json
-{
-  "timestamp": "2024-01-15T10:30:00",
-  "servers": [
-    {
-      "server": "prod-01",
-      "metrics": {
-        "cpu": {"usage": 45.2, "cores": 4},
-        "memory": {"used": 3.5, "total": 8.0, "percent": 43.75},
-        "disk": {"used": 50.2, "total": 100.0, "percent": 50.2}
-      },
-      "alerts": []
-    }
-  ],
-  "summary": {"total": 1, "healthy": 1, "warning": 0, "critical": 0}
-}
-```
-
 ## 告警阈值
 
 可在配置文件中设置告警阈值：
@@ -113,31 +93,8 @@ python3 {baseDir}/bt-config.py list
 python3 {baseDir}/bt-config.py threshold --cpu 75 --memory 80
 ```
 
-## 数据说明
+## TODO
 
-### 返回字段
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| server | string | 服务器名称 |
-| metrics.cpu.usage | number | CPU使用率(%) |
-| metrics.cpu.cores | number | CPU核心数 |
-| metrics.memory.percent | number | 内存使用率(%) |
-| metrics.disk.percent | number | 磁盘使用率(%) |
-| alerts | array | 告警列表 |
-| summary | object | 汇总统计 |
-
-### 告警级别
-
-| 级别 | 说明 |
-|------|------|
-| warning | 资源使用率超过阈值 |
-| critical | 磁盘使用率超过阈值 |
-
-## 错误处理
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| 未找到配置文件 | 未配置服务器 | 运行 bt-config.py init |
-| 无法连接到服务器 | 网络或地址错误 | 检查面板地址和网络 |
-| API请求失败 | Token无效或过期 | 更新API Token |
+- [ ] 通过实际服务器测试验证输出格式
+- [ ] 根据实际API返回数据优化输出结构
+- [ ] 完善数据字段文档

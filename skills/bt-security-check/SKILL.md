@@ -81,36 +81,6 @@ python3 {baseDir}/bt-security-check/scripts/security.py --output security-report
 - 可疑 IP 识别
 - 暴力破解检测
 
-## 输出示例
-
-```json
-{
-  "timestamp": "2024-01-15T10:30:00",
-  "servers": [
-    {
-      "server": "prod-01",
-      "ssh": {
-        "port": 22,
-        "status": "running",
-        "analysis": {
-          "status": "warning",
-          "issues": [
-            {"level": "warning", "message": "SSH使用默认端口22"}
-          ]
-        }
-      },
-      "firewall": {
-        "status": "running",
-        "enabled": true
-      },
-      "riskLevel": "medium",
-      "alerts": []
-    }
-  ],
-  "summary": {"total": 1, "low": 0, "medium": 1, "high": 0, "critical": 0}
-}
-```
-
 ## 风险等级
 
 | 等级 | 条件 | 说明 |
@@ -120,36 +90,9 @@ python3 {baseDir}/bt-security-check/scripts/security.py --output security-report
 | high | 3+个警告或1个严重问题 | 需要尽快处理 |
 | critical | 存在严重安全风险 | 需要立即处理 |
 
-## 数据说明
+## TODO
 
-### 返回字段
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| server | string | 服务器名称 |
-| ssh.port | number | SSH端口 |
-| ssh.analysis.status | string | SSH安全状态 |
-| ssh.analysis.issues | array | SSH问题列表 |
-| firewall.status | string | 防火墙状态 |
-| firewall.enabled | boolean | 防火墙是否启用 |
-| logs.suspiciousIps | array | 可疑IP列表 |
-| riskLevel | string | 风险等级 |
-| alerts | array | 告警列表 |
-
-### 安全建议
-
-| 检测项 | 风险 | 建议 |
-|--------|------|------|
-| SSH默认端口 | 中 | 修改为非常规端口 |
-| 允许密码登录 | 中 | 使用密钥认证 |
-| 允许Root登录 | 中 | 禁用Root直接登录 |
-| 防火墙未启用 | 高 | 启用防火墙 |
-| 暴力破解尝试 | 高 | 安装fail2ban |
-
-## 错误处理
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| 未找到配置文件 | 未配置服务器 | 运行 bt-config.py init |
-| 无法获取SSH信息 | API权限不足 | 检查面板API权限 |
-| 防火墙状态未知 | 系统不支持 | 手动检查防火墙 |
+- [ ] 通过实际服务器测试验证输出格式
+- [ ] 根据实际API返回数据优化输出结构
+- [ ] 完善数据字段文档
+- [ ] 验证登录日志分析逻辑

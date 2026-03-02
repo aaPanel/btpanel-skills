@@ -151,12 +151,15 @@ def build_single_skill(skill_name: str, dist_dir: Path) -> Optional[Path]:
     # 3. 复制公共模块
     copy_common_module(output_dir)
 
-    # 4. 复制配置管理工具
-    config_tool = PROJECT_ROOT / "scripts" / "bt-config.py"
-    if config_tool.exists():
-        shutil.copy(config_tool, output_dir / "bt-config.py")
-        (output_dir / "bt-config.py").chmod(0o755)
-        print(f"  ✓ 复制配置工具: bt-config.py")
+    # 4. 复制配置工具和环境检查脚本
+    common_scripts_dir = PROJECT_ROOT / "skills" / COMMON_MODULE / "scripts"
+    if common_scripts_dir.exists():
+        for script_name in ["bt-config.py", "check_env.py"]:
+            script_file = common_scripts_dir / script_name
+            if script_file.exists():
+                shutil.copy(script_file, output_dir / script_name)
+                (output_dir / script_name).chmod(0o755)
+                print(f"  ✓ 复制工具: {script_name}")
 
     # 5. 创建配置示例
     create_config_example(output_dir)
