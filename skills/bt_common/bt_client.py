@@ -156,10 +156,65 @@ class BtClient:
         result = self.request(API_ENDPOINTS["SERVICE_LIST"])
         return result if isinstance(result, list) else result.get("data", [])
 
-    def get_site_list(self) -> list:
-        """获取网站列表"""
-        result = self.request(API_ENDPOINTS["SITE_LIST"])
-        return result if isinstance(result, list) else result.get("data", [])
+    def get_site_list(self, page: int = 1, limit: int = 100) -> list:
+        """
+        获取PHP网站列表（传统网站）
+
+        Args:
+            page: 页码
+            limit: 每页数量
+        """
+        params = {"type": "-1", "search": "", "p": page, "limit": limit, "table": "sites", "order": ""}
+        result = self.request(API_ENDPOINTS["SITE_LIST"], params)
+        return result.get("data", []) if isinstance(result, dict) else []
+
+    def get_project_list(self, project_type: str, page: int = 1, limit: int = 100) -> list:
+        """
+        获取项目列表（Java/Node/Go/Python/.NET）
+
+        Args:
+            project_type: 项目类型 (Java/Node/Go/Python/net)
+            page: 页码
+            limit: 每页数量
+        """
+        from .api_endpoints import PROJECT_TYPES
+
+        endpoint_key = PROJECT_TYPES.get(project_type)
+        if not endpoint_key:
+            raise ValueError(f"不支持的项目类型: {project_type}，支持的类型: {list(PROJECT_TYPES.keys())}")
+
+        endpoint = API_ENDPOINTS[endpoint_key]
+        params = {"search": "", "p": page, "limit": limit, "type_id": ""}
+        result = self.request(endpoint, params)
+        return result.get("data", []) if isinstance(result, dict) else []
+
+    def get_all_sites(self) -> list:
+        """
+        获取所有网站和项目列表
+
+        Returns:
+            所有网站的列表，包含不同类型的项目
+        """
+        all_sites = []
+
+        # 获取PHP网站
+        php_sites = self.get_site_list()
+        for site in php_sites:
+            site["_source"] = "PHP"
+            all_sites.append(site)
+
+        # 获取各类型项目
+        for project_type in ["Java", "Node", "Go", "Python", "net"]:
+            try:
+                projects = self.get_project_list(project_type)
+                for proj in projects:
+                    proj["_source"] = project_type
+                    all_sites.append(proj)
+            except Exception:
+                # 忽略单个类型的获取错误
+                pass
+
+        return all_sites
 
     def get_database_list(self) -> list:
         """获取数据库列表"""

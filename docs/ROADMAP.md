@@ -220,57 +220,107 @@ POST /safe?action=GetSshInfo
 - 列出所有网站及运行状态
 - 检查SSL证书有效期
 - 显示网站基本信息（域名、路径、PHP版本）
-- 检测网站可访问性（可选）
+- 显示进程信息（Java/Node/Go/Python/.NET项目）
+- 识别反向代理和重定向配置
 
-#### 宝塔API端点（待确认）
-```
-# 网站列表
-POST /site?action=GetSiteList
+#### 网站类型与API端点
 
-# 网站状态
-POST /site?action=GetSiteStatus
-  参数: siteName (网站名)
+宝塔面板按项目类型分不同API端点获取网站列表：
 
-# SSL证书信息
-POST /site?action=GetSSL
-  参数: siteName (网站名)
-```
+| 类型 | API端点 | 进程信息 | 备注 |
+|------|---------|----------|------|
+| PHP | `/datalist/data/get_data_list` | ❌ 无 | Nginx/Apache托管，只有配置状态 |
+| Java | `/mod/java/project/project_list` | ✅ `pid_info` | SpringBoot等 |
+| Node | `/project/nodejs/get_project_list` | ✅ `load_info` | PM2管理 |
+| Go | `/project/go/get_project_list` | ✅ `load_info` | Go程序 |
+| Python | `/project/python/GetProjectList` | ✅ `pids`/`run` | Gunicorn等 |
+| .NET | `/project/net/get_project_list` | ✅ `load_info` | .NET应用 |
 
-#### 输出结构
+#### PHP项目关键字段
+
 ```json
 {
-  "sites": [
-    {
-      "name": "example.com",
-      "status": "running",
-      "domains": ["example.com", "www.example.com"],
-      "path": "/www/wwwroot/example.com",
-      "php_version": "8.1",
-      "ssl": {
-        "enabled": true,
-        "issuer": "Let's Encrypt",
-        "valid_to": "2024-04-15",
-        "days_remaining": 90,
-        "status": "valid"
-      },
-      "nginx": {
-        "error_log": "/www/wwwlogs/example.com.error.log",
-        "access_log": "/www/wwwlogs/example.com.log"
-      }
-    }
-  ],
-  "summary": {
-    "total": 10,
-    "running": 9,
-    "stopped": 1,
-    "ssl_expiring_soon": 2,
-    "ssl_expired": 0
+  "id": 34,
+  "name": "example.com",
+  "path": "/www/wwwroot/example",
+  "status": "1",              // "1"=运行, "0"=停止
+  "stop": "",                 // 非空表示已停止
+  "project_type": "PHP",
+  "php_version": "8.4",
+  "php_version_status": true,
+  "ssl": {
+    "issuer": "Let's Encrypt",
+    "notAfter": "2024-01-29",
+    "endtime": -763           // 负数=已过期，天数
   },
-  "alerts": [
-    {"level": "critical", "site": "test.com", "message": "SSL证书已过期"},
-    {"level": "warning", "site": "old.com", "message": "SSL证书将在7天内过期"}
-  ]
+  "proxy": false,             // 是否反向代理
+  "redirect": false,          // 是否重定向
+  "waf": {"status": true},    // 防火墙状态
+  "domain": 2,                // 域名数量
+  "backup_count": 0,          // 备份数量
+  "site_total_status": true,  // 整体状态
+  "net": {                    // 流量统计
+    "one_day_total_flow": 680,
+    "one_day_total_pv": 0
+  }
 }
+```
+
+#### Java/Node/Go/NET项目进程信息
+
+```json
+{
+  "pid": 3180584,
+  "status": "睡眠",           // 进程状态
+  "memory_used": 22224896,    // 内存使用(bytes)
+  "cpu_percent": 0.0,         // CPU使用率
+  "threads": 12,              // 线程数
+  "connects": 0,              // 连接数
+  "running_time": 0.12,       // 运行时间(小时)
+  "exe": "/path/to/executable"
+}
+```
+
+#### 运行状态判断逻辑
+
+```
+PHP项目:
+  - status == "1" && stop == "" → 运行中
+  - status == "0" || stop != "" → 已停止
+
+Java项目:
+  - pid_info存在 && pid > 0 → 运行中
+  - starting == true → 启动中
+
+Node项目:
+  - load_info存在 && 有pid → 运行中
+  - run == true → 运行中
+
+Go/NET项目:
+  - load_info存在 && 有pid → 运行中
+  - run == true → 运行中
+
+Python项目:
+  - run == true → 运行中
+  - pids非空 → 运行中
+```
+
+#### SSL证书状态判断
+
+```python
+def check_ssl_status(ssl_data):
+    if ssl_data == -1 or ssl_data is None:
+        return {"status": "none", "message": "未配置SSL"}
+
+    endtime = ssl_data.get("endtime", 0)
+    if endtime < 0:
+        return {"status": "expired", "message": f"已过期{-endtime}天"}
+    elif endtime <= 7:
+        return {"status": "critical", "message": f"将在{endtime}天内过期"}
+    elif endtime <= 30:
+        return {"status": "warning", "message": f"将在{endtime}天内过期"}
+    else:
+        return {"status": "valid", "message": f"剩余{endtime}天"}
 ```
 
 ---

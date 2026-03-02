@@ -29,9 +29,15 @@ API_ENDPOINTS = {
     "SERVICE_LIST": "/system?action=GetServiceList",
     "SERVICE_STATUS": "/system?action=GetServiceStatus",
 
-    # 网站管理
-    "SITE_LIST": "/site?action=GetSiteList",
-    "SITE_STATUS": "/site?action=GetSiteStatus",
+    # 网站管理 - PHP项目（传统网站）
+    "SITE_LIST": "/datalist/data/get_data_list",  # 需要参数 table=sites
+
+    # 项目管理 - 不同类型的项目有不同端点
+    "PROJECT_JAVA_LIST": "/mod/java/project/project_list",
+    "PROJECT_NODE_LIST": "/project/nodejs/get_project_list",
+    "PROJECT_GO_LIST": "/project/go/get_project_list",
+    "PROJECT_PYTHON_LIST": "/project/python/GetProjectList",
+    "PROJECT_NET_LIST": "/project/net/get_project_list",
 
     # 数据库
     "DATABASE_LIST": "/database?action=GetDatabases",
@@ -46,7 +52,7 @@ API_GROUPS = {
     "logs": ["PANEL_LOGS", "ERROR_LOGS", "SITE_LOGS"],
     "security": ["FIREWALL_STATUS", "SECURITY_LOGS", "SSH_INFO"],
     "service": ["SERVICE_LIST", "SERVICE_STATUS"],
-    "site": ["SITE_LIST", "SITE_STATUS"],
+    "site": ["SITE_LIST", "PROJECT_JAVA_LIST", "PROJECT_NODE_LIST", "PROJECT_GO_LIST", "PROJECT_PYTHON_LIST", "PROJECT_NET_LIST"],
     "database": ["DATABASE_LIST"],
     "task": ["TASK_LIST"],
 }
@@ -62,10 +68,24 @@ API_DESCRIPTIONS = {
     "SSH_INFO": "获取SSH配置信息",
     "SERVICE_LIST": "获取服务列表",
     "SERVICE_STATUS": "获取服务状态",
-    "SITE_LIST": "获取网站列表",
-    "SITE_STATUS": "获取网站状态",
+    "SITE_LIST": "获取PHP网站列表（传统网站）",
+    "PROJECT_JAVA_LIST": "获取Java项目列表",
+    "PROJECT_NODE_LIST": "获取Node.js项目列表",
+    "PROJECT_GO_LIST": "获取Go项目列表",
+    "PROJECT_PYTHON_LIST": "获取Python项目列表",
+    "PROJECT_NET_LIST": "获取.NET项目列表",
     "DATABASE_LIST": "获取数据库列表",
     "TASK_LIST": "获取任务列表",
+}
+
+# 项目类型映射
+PROJECT_TYPES = {
+    "PHP": "SITE_LIST",
+    "Java": "PROJECT_JAVA_LIST",
+    "Node": "PROJECT_NODE_LIST",
+    "Go": "PROJECT_GO_LIST",
+    "Python": "PROJECT_PYTHON_LIST",
+    "net": "PROJECT_NET_LIST",
 }
 
 

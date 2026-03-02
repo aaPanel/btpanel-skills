@@ -429,4 +429,5 @@ class TestAPIEndpoints:
         """测试端点格式"""
         for name, endpoint in API_ENDPOINTS.items():
             assert endpoint.startswith("/"), f"{name} 端点应以 / 开头"
-            assert "action=" in endpoint, f"{name} 端点应包含 action 参数"
+            # 部分端点使用路径形式而非action参数
+            # 例如: /datalist/data/get_data_list, /project/nodejs/get_project_list
