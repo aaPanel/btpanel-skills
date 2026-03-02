@@ -19,32 +19,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
-# 宝塔API端点定义
-API_ENDPOINTS = {
-    # 系统状态
-    "SYSTEM_STATUS": "/system?action=GetSystemTotal",
-    "SYSTEM_INFO": "/system?action=GetSystemTotal",
-    "NETWORK_INFO": "/system?action=GetNetWork",
-    # 日志相关
-    "PANEL_LOGS": "/logs?action=GetLogs",
-    "ERROR_LOGS": "/site?action=GetErrorLog",
-    "SITE_LOGS": "/site?action=GetSiteLogs",
-    # 安全相关
-    "FIREWALL_STATUS": "/safe?action=GetFirewallStatus",
-    "SECURITY_LOGS": "/safe?action=GetLogs",
-    "SSH_INFO": "/safe?action=GetSshInfo",
-    # 服务管理
-    "SERVICE_LIST": "/system?action=GetServiceList",
-    "SERVICE_STATUS": "/system?action=GetServiceStatus",
-    # 网站管理
-    "SITE_LIST": "/site?action=GetSiteList",
-    "SITE_STATUS": "/site?action=GetSiteStatus",
-    # 数据库
-    "DATABASE_LIST": "/database?action=GetDatabases",
-    # 任务管理
-    "TASK_LIST": "/task?action=GetTaskList",
-}
+from .api_endpoints import API_ENDPOINTS, MIN_PANEL_VERSION, get_endpoint
 
 
 def sign_request(token: str, params: Optional[dict] = None) -> dict:

@@ -1,6 +1,6 @@
 ---
 name: bt-health-check
-description: 服务健康检查技能，检查网站、数据库、服务等运行状态
+description: 宝塔面板(BT-Panel)服务健康检查技能，检查网站、数据库、服务等运行状态
 user-invocable: true
 disable-model-invocation: false
 metadata:
@@ -8,101 +8,34 @@ metadata:
     requires:
       bins:
         - python3
+    keywords:
+      - 宝塔面板
+      - BT-Panel
+      - 面板
+      - 健康检查
+      - 服务监控
+      - 网站状态
+      - 数据库状态
 ---
 
 # 宝塔面板服务健康检查
 
 检查宝塔面板服务器的服务运行状态，包括网站、数据库、系统服务等。
 
+## AI 使用约束
+
+本技能用于查询和展示服务器健康状态，AI应遵循以下原则：
+
+1. **数据中立**：如实展示健康检查结果，不夸大或淡化问题
+2. **客观分析**：基于检查规则给出状态判断，避免主观判断
+3. **数据驱动**：建议和结论应基于实际检查数据，不得臆测
+4. **隐私保护**：不主动泄露服务器敏感信息（如IP、Token、域名）
+5. **状态优先级**：critical > warning > healthy，优先报告严重问题
+
 ## 版本要求
 
 - **宝塔面板**: >= 9.0.0
 - **Python**: >= 3.10
-
-## 环境要求
-
-### 支持平台
-- Linux (Ubuntu 20.04+, CentOS 7+, Debian 10+)
-- macOS (10.15+)
-- Windows 10/11
-
-### Python 版本
-- Python 3.10 或更高版本
-
-### 依赖
-- `requests>=2.28` - HTTP 请求
-- `pyyaml>=6.0` - YAML 配置解析
-- `rich>=13.0` - 可选，用于表格输出
-
-## 快速开始
-
-### 1. 环境检查
-
-首次使用前，运行环境检查脚本确认环境就绪：
-
-```bash
-# 检查环境
-python3 {baseDir}/scripts/check_env.py
-
-# JSON 格式输出（供 AI 解析）
-python3 {baseDir}/scripts/check_env.py --format json
-```
-
-### 2. 安装依赖
-
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt install python3 python3-pip python3-yaml python3-requests
-pip3 install rich --user
-```
-
-**Linux (CentOS/RHEL):**
-```bash
-sudo dnf install python3 python3-pip python3-pyyaml python3-requests
-pip3 install rich --user
-```
-
-**macOS:**
-```bash
-brew install python3 pyyaml
-pip3 install requests rich
-```
-
-**Windows:**
-```powershell
-pip install requests pyyaml rich
-```
-
-或使用 pip 统一安装：
-```bash
-pip install -r {baseDir}/requirements.txt
-```
-
-### 3. 配置服务器
-
-配置文件支持两种位置：
-
-**方式一：全局配置（推荐）**
-```bash
-# 全局配置路径
-~/.openclaw/bt-skills.yaml
-```
-
-**方式二：本地配置**
-```bash
-# 本地配置路径
-{baseDir}/config/servers.local.yaml
-```
-
-配置文件内容：
-```yaml
-servers:
-  - name: "prod-01"
-    host: "https://your-panel.com:8888"
-    token: "YOUR_API_TOKEN"
-    timeout: 10000
-    enabled: true
-```
 
 ## 用法
 
@@ -127,12 +60,6 @@ python3 {baseDir}/bt-health-check/scripts/health.py --format json
 
 # 表格格式输出
 python3 {baseDir}/bt-health-check/scripts/health.py --format table
-
-# 输出到文件
-python3 {baseDir}/bt-health-check/scripts/health.py --output health-report.json
-
-# 指定配置文件
-python3 {baseDir}/bt-health-check/scripts/health.py --config /path/to/config.yaml
 ```
 
 ## 参数说明
@@ -159,7 +86,7 @@ python3 {baseDir}/bt-health-check/scripts/health.py --config /path/to/config.yam
 
 ### 网站状态
 - 网站运行状态
-- SSL 证书有效期检查（7天内告警、30天内警告）
+- SSL 证书有效期检查
 - 网站路径信息
 
 ### 数据库状态
@@ -200,20 +127,23 @@ python3 {baseDir}/bt-health-check/scripts/health.py --config /path/to/config.yam
 
 ## 健康状态
 
-| 状态 | 说明 |
-|------|------|
-| **healthy** | 所有服务正常 |
-| **warning** | 存在非关键警告 |
-| **critical** | 存在关键服务停止或 SSL 证书即将过期 |
+| 状态 | 条件 | 说明 |
+|------|------|------|
+| healthy | 无告警 | 所有服务正常运行 |
+| warning | 存在非关键警告 | 需要关注但不紧急 |
+| critical | 关键服务停止或SSL即将过期 | 需要立即处理 |
 
 ### 关键服务
 
 以下服务停止会触发 critical 告警：
-- nginx
-- apache
-- mysql
-- mariadb
-- redis
+
+| 服务 | 类型 |
+|------|------|
+| nginx | Web服务器 |
+| apache | Web服务器 |
+| mysql | 数据库 |
+| mariadb | 数据库 |
+| redis | 缓存 |
 
 ### SSL 证书告警
 
@@ -222,39 +152,38 @@ python3 {baseDir}/bt-health-check/scripts/health.py --config /path/to/config.yam
 | ≤ 7 天 | critical |
 | ≤ 30 天 | warning |
 
-## 故障排除
+## 数据说明
 
-### 常见问题
+### 返回字段
 
-**1. 服务列表为空**
-```
-原因: 宝塔面板 API 版本差异
-解决: 确保面板版本 >= 9.0
-```
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| server | string | 服务器名称 |
+| services.total | number | 服务总数 |
+| services.running | number | 运行中服务数 |
+| services.stopped | number | 已停止服务数 |
+| sites.total | number | 网站总数 |
+| sites.running | number | 运行中网站数 |
+| databases.total | number | 数据库总数 |
+| databases.sizeTotal | number | 数据库总大小(MB) |
+| overallStatus | string | 整体状态 |
+| alerts | array | 告警列表 |
 
-**2. 网站状态获取失败**
-```
-原因: 网站模块 API 权限不足
-解决: 检查 API Token 权限
-```
+### 告警字段
 
-**3. 数据库大小显示为 0**
-```
-原因: 宝塔面板未计算数据库大小
-解决: 在面板中手动刷新数据库统计
-```
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| level | string | 告警级别 (warning/critical) |
+| type | string | 告警类型 (service/ssl) |
+| message | string | 告警信息 |
+| service | string | 相关服务名（可选） |
+| site | string | 相关网站名（可选） |
 
-**4. 宝塔版本不兼容**
-```
-注意: 请确保宝塔面板版本 >= 9.0
-```
+## 错误处理
 
-## 独立部署
-
-此技能可以独立部署，使用打包脚本：
-
-```bash
-python3 {baseDir}/scripts/build_skills.py --skill bt-health-check
-```
-
-打包后的技能位于 `dist/bt-health-check/` 目录。
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| 未找到配置文件 | 未配置服务器 | 运行 bt-config.py init |
+| 服务列表为空 | API版本不兼容 | 确保面板版本 >= 9.0 |
+| 网站状态获取失败 | API权限不足 | 检查API Token权限 |
+| 数据库大小为0 | 面板未统计 | 手动刷新数据库统计 |

@@ -3,13 +3,27 @@ bt-common 公共模块
 提供宝塔API客户端、配置管理和工具函数
 """
 
-from .bt_client import BtClient, BtClientManager, API_ENDPOINTS
+from .api_endpoints import (
+    API_ENDPOINTS,
+    API_GROUPS,
+    API_DESCRIPTIONS,
+    MIN_PANEL_VERSION,
+    get_endpoint,
+    get_endpoints_by_group,
+    list_endpoints,
+    get_endpoint_description,
+)
+from .bt_client import (
+    BtClient,
+    BtClientManager,
+    sign_request,
+)
 from .config import (
     Config,
     ServerConfig,
     ThresholdConfig,
     GlobalConfig,
-    MIN_PANEL_VERSION,
+    MIN_PANEL_VERSION as CONFIG_MIN_PANEL_VERSION,
     GLOBAL_CONFIG_FILE,
     load_config,
     load_config_object,
@@ -33,16 +47,25 @@ from .utils import (
 )
 
 __all__ = [
+    # API端点
+    "API_ENDPOINTS",
+    "API_GROUPS",
+    "API_DESCRIPTIONS",
+    "MIN_PANEL_VERSION",
+    "get_endpoint",
+    "get_endpoints_by_group",
+    "list_endpoints",
+    "get_endpoint_description",
     # 客户端
     "BtClient",
     "BtClientManager",
-    "API_ENDPOINTS",
+    "sign_request",
     # 配置
     "Config",
     "ServerConfig",
     "ThresholdConfig",
     "GlobalConfig",
-    "MIN_PANEL_VERSION",
+    "CONFIG_MIN_PANEL_VERSION",
     "GLOBAL_CONFIG_FILE",
     "load_config",
     "load_config_object",

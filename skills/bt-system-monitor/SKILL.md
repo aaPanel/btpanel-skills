@@ -1,6 +1,6 @@
 ---
 name: bt-system-monitor
-description: 系统资源监控技能，监控CPU、内存、磁盘和网络使用情况
+description: 宝塔面板(BT-Panel)系统资源监控技能，监控服务器CPU、内存、磁盘和网络使用情况
 user-invocable: true
 disable-model-invocation: false
 metadata:
@@ -8,114 +8,34 @@ metadata:
     requires:
       bins:
         - python3
+    keywords:
+      - 宝塔面板
+      - BT-Panel
+      - 面板
+      - 服务器监控
+      - 系统资源
+      - CPU监控
+      - 内存监控
+      - 磁盘监控
 ---
 
 # 宝塔面板系统资源监控
 
 监控宝塔面板服务器的CPU、内存、磁盘和网络使用情况。
 
+## AI 使用约束
+
+本技能用于查询和展示服务器状态数据，AI应遵循以下原则：
+
+1. **数据中立**：如实展示监控数据，不夸大或缩小问题严重性
+2. **客观分析**：基于阈值配置给出告警，避免主观判断
+3. **数据驱动**：建议和结论应基于实际数据，不得臆测
+4. **隐私保护**：不主动泄露服务器敏感信息（如IP、Token）
+
 ## 版本要求
 
 - **宝塔面板**: >= 9.0.0
 - **Python**: >= 3.10
-
-## 环境要求
-
-### 支持平台
-- Linux (Ubuntu 20.04+, CentOS 7+, Debian 10+)
-- macOS (10.15+)
-- Windows 10/11
-
-### Python 版本
-- Python 3.10 或更高版本
-
-### 依赖
-- `requests>=2.28` - HTTP 请求
-- `pyyaml>=6.0` - YAML 配置解析
-- `rich>=13.0` - 可选，用于表格输出
-
-## 快速开始
-
-### 1. 环境检查
-
-首次使用前，运行环境检查脚本确认环境就绪：
-
-```bash
-# 检查环境
-python3 {baseDir}/scripts/check_env.py
-
-# JSON 格式输出（供 AI 解析）
-python3 {baseDir}/scripts/check_env.py --format json
-```
-
-### 2. 安装依赖
-
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt install python3 python3-pip python3-yaml python3-requests
-pip3 install rich --user
-```
-
-**Linux (CentOS/RHEL):**
-```bash
-sudo dnf install python3 python3-pip python3-pyyaml python3-requests
-pip3 install rich --user
-```
-
-**macOS:**
-```bash
-brew install python3 pyyaml
-pip3 install requests rich
-```
-
-**Windows:**
-```powershell
-pip install requests pyyaml rich
-```
-
-或使用 pip 统一安装：
-```bash
-pip install -r {baseDir}/requirements.txt
-```
-
-### 3. 配置服务器
-
-配置文件支持两种位置：
-
-**方式一：全局配置（推荐）**
-```bash
-# 全局配置路径
-~/.openclaw/bt-skills.yaml
-```
-
-**方式二：本地配置**
-```bash
-# 本地配置路径
-{baseDir}/config/servers.local.yaml
-```
-
-配置文件内容：
-```yaml
-servers:
-  - name: "prod-01"
-    host: "https://your-panel.com:8888"
-    token: "YOUR_API_TOKEN"
-    timeout: 10000
-    enabled: true
-
-global:
-  thresholds:
-    cpu: 80
-    memory: 85
-    disk: 90
-```
-
-### 4. 获取宝塔 API Token
-
-1. 登录宝塔面板（版本 >= 9.0）
-2. 进入 **面板设置** -> **API接口**
-3. 开启 API 接口
-4. 复制 API 密钥（Token）
 
 ## 用法
 
@@ -134,12 +54,6 @@ python3 {baseDir}/bt-system-monitor/scripts/monitor.py --format table
 
 # 输出到文件
 python3 {baseDir}/bt-system-monitor/scripts/monitor.py --output report.json
-
-# 包含网络信息
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --include-network
-
-# 指定配置文件
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --config /path/to/config.yaml
 ```
 
 ## 参数说明
@@ -184,38 +98,46 @@ global:
     disk: 90     # 磁盘使用率告警阈值(%)
 ```
 
-## 故障排除
+## 配置管理
 
-### 常见问题
-
-**1. 配置文件未找到**
-```
-错误: 未找到配置文件
-解决: 创建 ~/.openclaw/bt-skills.yaml 或设置 BT_CONFIG_PATH 环境变量
-```
-
-**2. 连接失败**
-```
-错误: 无法连接到服务器
-解决: 检查网络连接、面板地址和 API Token 是否正确
-```
-
-**3. 宝塔版本不兼容**
-```
-注意: 请确保宝塔面板版本 >= 9.0
-```
-
-**4. SSL 证书错误**
-```
-注意: 默认禁用 SSL 证书验证（宝塔面板使用自签名证书）
-```
-
-## 独立部署
-
-此技能可以独立部署，使用打包脚本：
+使用配置工具管理服务器：
 
 ```bash
-python3 {baseDir}/scripts/build_skills.py --skill bt-system-monitor
+# 添加服务器
+python3 {baseDir}/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
+
+# 列出服务器
+python3 {baseDir}/bt-config.py list
+
+# 设置阈值
+python3 {baseDir}/bt-config.py threshold --cpu 75 --memory 80
 ```
 
-打包后的技能位于 `dist/bt-system-monitor/` 目录。
+## 数据说明
+
+### 返回字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| server | string | 服务器名称 |
+| metrics.cpu.usage | number | CPU使用率(%) |
+| metrics.cpu.cores | number | CPU核心数 |
+| metrics.memory.percent | number | 内存使用率(%) |
+| metrics.disk.percent | number | 磁盘使用率(%) |
+| alerts | array | 告警列表 |
+| summary | object | 汇总统计 |
+
+### 告警级别
+
+| 级别 | 说明 |
+|------|------|
+| warning | 资源使用率超过阈值 |
+| critical | 磁盘使用率超过阈值 |
+
+## 错误处理
+
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| 未找到配置文件 | 未配置服务器 | 运行 bt-config.py init |
+| 无法连接到服务器 | 网络或地址错误 | 检查面板地址和网络 |
+| API请求失败 | Token无效或过期 | 更新API Token |
