@@ -38,18 +38,17 @@ from .config import (
     get_config_info,
 )
 from .utils import (
+    Alert,
     format_bytes,
     format_uptime,
     format_timestamp,
     parse_system_monitor_data,
-    parse_system_status_legacy,
     check_thresholds,
     format_security_report,
     format_service_status,
     print_table,
     output_result,
     generate_summary_report,
-    Alert,
 )
 
 __all__ = [
@@ -85,16 +84,15 @@ __all__ = [
     "update_thresholds",
     "get_config_info",
     # 工具
+    "Alert",
     "format_bytes",
     "format_uptime",
     "format_timestamp",
     "parse_system_monitor_data",
-    "parse_system_status_legacy",
     "check_thresholds",
     "format_security_report",
     "format_service_status",
     "print_table",
     "output_result",
     "generate_summary_report",
-    "Alert",
 ]

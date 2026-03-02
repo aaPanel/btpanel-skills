@@ -25,7 +25,7 @@ from bt_common.utils import (
     Alert,
     check_thresholds,
     format_bytes,
-    parse_system_status_legacy,
+    parse_system_monitor_data,
     format_uptime,
 )
 
@@ -300,37 +300,59 @@ class TestUtils:
         assert format_uptime(86400) == "1天0小时"
         assert format_uptime(90061) == "1天1小时"
 
-    def test_parse_system_status_legacy(self):
-        """测试旧版系统状态解析"""
+    def test_parse_system_monitor_data(self):
+        """测试系统监控数据解析"""
+        # 模拟实际API返回数据
         data = {
-            "cpu_usage": 50.5,
-            "cpu_core": 4,
-            "cpu_model": "Intel Xeon",
-            "mem_total": 8589934592,  # 8GB in bytes
-            "mem_used": 4294967296,   # 4GB in bytes
-            "disk_total": 107374182400,  # 100GB in bytes
-            "disk_used": 53687091200,    # 50GB in bytes
-            "host_name": "test-server",
-            "system": "CentOS 7",
-            "up_time": 86400,
+            "cpu": [9.0, 2, [35.2, 18.8], "Common KVM processor * 1", 2, 1],
+            "cpu_times": {"user": 22.4, "system": 4.5, "idle": 73.2, "iowait": 0.0},
+            "load": {"one": 0.06, "five": 0.09, "fifteen": 0.05, "max": 4, "safe": 3.0},
+            "mem": {"memTotal": 1967, "memFree": 540, "memCached": 692, "memAvailable": 1035, "memRealUsed": 735},
+            "disk": [
+                {
+                    "path": "/",
+                    "size": ["39.0 GB", "35.0 GB", "4.0 GB", "89.75%", "0.00 b", "35.0"],
+                    "filesystem": "/dev/sda2",
+                    "type": "xfs",
+                    "byte_size": [41881174016, 37587406848, 4293767168],
+                }
+            ],
+            "network": {"lo": {"upTotal": 735440231, "downTotal": 735440231}},
+            "upTotal": 14243522823,
+            "downTotal": 76538967320,
+            "up": 2.22,
+            "down": 6.56,
+            "title": "test-server",
+            "system": "Debian GNU/Linux 12 (bookworm) x86_64(Py3.7.16)",
+            "simple_system": "Debian 12",
+            "time": "150天",
+            "version": "11.6.0",
+            "site_total": 13,
+            "database_total": 3,
+            "ftp_total": 0,
         }
 
-        result = parse_system_status_legacy(data, "test-server")
+        result = parse_system_monitor_data(data, "test-server")
 
         assert result["server"] == "test-server"
         assert "timestamp" in result
-        assert result["metrics"]["cpu"]["usage"] == 50.5
-        assert result["metrics"]["cpu"]["cores"] == 4
-        assert result["metrics"]["memory"]["percent"] == 50.0
-        assert result["metrics"]["disk"]["percent"] == 50.0
-        assert result["metrics"]["system"]["hostname"] == "test-server"
+        assert result["cpu"]["usage"] == 9.0
+        assert result["cpu"]["cores"] == 2
+        assert result["memory"]["total_mb"] == 1967
+        assert result["memory"]["percent"] > 0
+        assert result["disk"]["percent"] > 0
+        assert result["hostname"] == "test-server"
+        assert result["version"] == "11.6.0"
+        assert result["resources"]["sites"] == 13
+        assert result["resources"]["databases"] == 3
 
     def test_check_thresholds_no_alerts(self):
         """测试阈值检查无告警"""
         metrics = {
             "cpu": {"usage": 50},
-            "memory": {"percent": 60},
-            "disk": {"percent": 70},
+            "memory": {"percent": 60, "total_mb": 2048, "used_mb": 1229},
+            "disk": {"percent": 70, "disks": []},
+            "load": {"one_minute": 0.5, "cpu_count": 4},
         }
         thresholds = {"cpu": 80, "memory": 85, "disk": 90}
 
@@ -342,8 +364,9 @@ class TestUtils:
         """测试CPU告警"""
         metrics = {
             "cpu": {"usage": 85},
-            "memory": {"percent": 60},
-            "disk": {"percent": 70},
+            "memory": {"percent": 60, "total_mb": 2048, "used_mb": 1229},
+            "disk": {"percent": 70, "disks": []},
+            "load": {"one_minute": 0.5, "cpu_count": 4},
         }
         thresholds = {"cpu": 80, "memory": 85, "disk": 90}
 
@@ -357,8 +380,9 @@ class TestUtils:
         """测试多个告警"""
         metrics = {
             "cpu": {"usage": 85},
-            "memory": {"percent": 90},
-            "disk": {"percent": 95},
+            "memory": {"percent": 90, "total_mb": 2048, "used_mb": 1843},
+            "disk": {"percent": 95, "disks": []},
+            "load": {"one_minute": 0.5, "cpu_count": 4},
         }
         thresholds = {"cpu": 80, "memory": 85, "disk": 90}
 
@@ -395,7 +419,6 @@ class TestAPIEndpoints:
     def test_endpoints_exist(self):
         """测试端点定义存在"""
         assert "SYSTEM_STATUS" in API_ENDPOINTS
-        assert "SYSTEM_NETWORK" in API_ENDPOINTS
         assert "FIREWALL_STATUS" in API_ENDPOINTS
         assert "SSH_INFO" in API_ENDPOINTS
         assert "SERVICE_LIST" in API_ENDPOINTS

@@ -34,8 +34,7 @@ from bt_common import (
     BtClient,
     BtClientManager,
     check_thresholds,
-    format_system_status,
-    format_uptime,
+    parse_system_monitor_data,
     load_config,
 )
 
@@ -51,55 +50,27 @@ def get_server_system_status(client: BtClient, thresholds: dict) -> dict:
     Returns:
         系统状态信息
     """
-    # 获取系统状态
+    # 获取系统状态（GetNetWork接口返回完整监控数据）
     status_data = client.get_system_status()
 
-    # 格式化数据
-    formatted = format_system_status(status_data, client.name)
+    # 解析数据
+    formatted = parse_system_monitor_data(status_data, client.name)
 
     # 检查告警
-    alerts = check_thresholds(formatted["metrics"], thresholds)
+    alerts = check_thresholds(formatted, thresholds)
 
-    result = formatted if isinstance(formatted, dict) else asdict(formatted)
+    result = formatted
     result["alerts"] = [asdict(a) if hasattr(a, "__dataclass_fields__") else a for a in alerts]
     return result
 
 
-def get_server_network_info(client: BtClient) -> dict:
-    """
-    获取网络信息
-
-    Args:
-        client: 宝塔客户端
-
-    Returns:
-        网络信息
-    """
-    from datetime import datetime
-
-    net_data = client.get_network_info()
-
-    return {
-        "server": client.name,
-        "timestamp": datetime.now().isoformat(),
-        "network": {
-            "up": net_data.get("up", 0),
-            "down": net_data.get("down", 0),
-            "upTotal": net_data.get("up_total", 0),
-            "downTotal": net_data.get("down_total", 0),
-            "interfaces": net_data.get("interfaces", []),
-        },
-    }
-
-
-def run_monitor(manager: BtClientManager, server: Optional[str] = None, include_network: bool = False) -> dict:
+def run_monitor(manager: BtClientManager, server: Optional[str] = None) -> dict:
     """
     执行系统监控
 
     Args:
         manager: 客户端管理器
         server: 指定服务器名称
-        include_network: 是否包含网络信息
 
     Returns:
         监控结果
@@ -111,12 +82,7 @@ def run_monitor(manager: BtClientManager, server: Optional[str] = None, include_
     # 单个服务器
     if server:
         client = manager.get_client(server)
-        status = get_server_system_status(client, thresholds)
-
-        if include_network:
-            status["network"] = get_server_network_info(client)["network"]
-
-        return status
+        return get_server_system_status(client, thresholds)
 
     # 所有服务器
     all_clients = manager.get_all_clients()
@@ -129,10 +95,6 @@ def run_monitor(manager: BtClientManager, server: Optional[str] = None, include_
     for name, client in all_clients.items():
         try:
             status = get_server_system_status(client, thresholds)
-
-            if include_network:
-                status["network"] = get_server_network_info(client)["network"]
-
             results["servers"].append(status)
 
             # 统计健康状态
@@ -171,6 +133,7 @@ def print_table_output(results: dict):
             # 多服务器模式
             table = Table(title="系统资源监控")
             table.add_column("服务器", style="cyan")
+            table.add_column("系统", style="white")
             table.add_column("CPU", style="green")
             table.add_column("内存", style="yellow")
             table.add_column("磁盘", style="red")
@@ -183,14 +146,14 @@ def print_table_output(results: dict):
                         "-",
                         "-",
                         "-",
+                        "-",
                         "[red]连接失败[/red]",
                     )
                     continue
 
-                metrics = server.get("metrics", {})
-                cpu = metrics.get("cpu", {})
-                memory = metrics.get("memory", {})
-                disk = metrics.get("disk", {})
+                cpu = server.get("cpu", {})
+                memory = server.get("memory", {})
+                disk = server.get("disk", {})
 
                 # 确定状态颜色
                 alerts = server.get("alerts", [])
@@ -202,7 +165,8 @@ def print_table_output(results: dict):
                     status = "[yellow]警告[/yellow]"
 
                 table.add_row(
-                    server["server"],
+                    server.get("server", "Unknown"),
+                    server.get("simple_system", server.get("system", "-")),
                     f"{cpu.get('usage', 0):.1f}%",
                     f"{memory.get('percent', 0):.1f}%",
                     f"{disk.get('percent', 0):.1f}%",
@@ -220,24 +184,70 @@ def print_table_output(results: dict):
             )
         else:
             # 单服务器模式
-            table = Table(title=f"服务器: {results.get('server', 'Unknown')}")
+            server_name = results.get("server", "Unknown")
+            table = Table(title=f"服务器: {server_name}")
             table.add_column("指标", style="cyan")
             table.add_column("值", style="green")
 
-            metrics = results.get("metrics", {})
-            cpu = metrics.get("cpu", {})
-            memory = metrics.get("memory", {})
-            disk = metrics.get("disk", {})
-            system = metrics.get("system", {})
+            cpu = results.get("cpu", {})
+            memory = results.get("memory", {})
+            disk = results.get("disk", {})
+            load = results.get("load", {})
+            network = results.get("network", {})
 
-            table.add_row("CPU使用率", f"{cpu.get('usage', 0):.1f}%")
-            table.add_row("CPU核心", str(cpu.get("cores", 1)))
-            table.add_row("内存使用", f"{memory.get('used', 0):.1f}/{memory.get('total', 0):.1f} GB ({memory.get('percent', 0):.1f}%)")
-            table.add_row("磁盘使用", f"{disk.get('used', 0):.1f}/{disk.get('total', 0):.1f} GB ({disk.get('percent', 0):.1f}%)")
-            table.add_row("主机名", system.get("hostname", "Unknown"))
-            table.add_row("运行时间", system.get("uptime", "Unknown"))
+            table.add_row("系统", results.get("system", "Unknown"))
+            table.add_row("主机名", results.get("hostname", "Unknown"))
+            table.add_row("运行时间", results.get("uptime", "Unknown"))
+            table.add_row("面板版本", results.get("version", "Unknown"))
+            table.add_row("", "")
+            table.add_row("[bold]CPU[/bold]", "")
+            table.add_row("  使用率", f"{cpu.get('usage', 0):.1f}%")
+            table.add_row("  核心数", str(cpu.get("cores", 1)))
+            table.add_row("  型号", str(cpu.get("model", "Unknown")))
+            table.add_row("", "")
+            table.add_row("[bold]内存[/bold]", "")
+            table.add_row("  使用量", f"{memory.get('used_mb', 0)}/{memory.get('total_mb', 0)} MB")
+            table.add_row("  使用率", f"{memory.get('percent', 0):.1f}%")
+            table.add_row("  可用", f"{memory.get('available_mb', 0)} MB")
+            table.add_row("", "")
+            table.add_row("[bold]磁盘[/bold]", "")
+            table.add_row("  使用量", f"{disk.get('used_human', '0')}/{disk.get('total_human', '0')}")
+            table.add_row("  使用率", f"{disk.get('percent', 0):.1f}%")
+            table.add_row("", "")
+            table.add_row("[bold]负载[/bold]", "")
+            table.add_row("  1分钟", f"{load.get('one_minute', 0):.2f}")
+            table.add_row("  5分钟", f"{load.get('five_minute', 0):.2f}")
+            table.add_row("  15分钟", f"{load.get('fifteen_minute', 0):.2f}")
+            table.add_row("", "")
+            table.add_row("[bold]网络[/bold]", "")
+            table.add_row("  上行", f"{network.get('current_up', 0):.2f} KB/s")
+            table.add_row("  下行", f"{network.get('current_down', 0):.2f} KB/s")
+            table.add_row("  总上行", network.get("total_up", "0"))
+            table.add_row("  总下行", network.get("total_down", "0"))
+            table.add_row("", "")
+            table.add_row("[bold]资源[/bold]", "")
+            table.add_row("  网站", str(results.get("resources", {}).get("sites", 0)))
+            table.add_row("  数据库", str(results.get("resources", {}).get("databases", 0)))
 
             console.print(table)
+
+            # 打印磁盘分区
+            disks = disk.get("disks", [])
+            if disks:
+                disk_table = Table(title="磁盘分区")
+                disk_table.add_column("挂载点", style="cyan")
+                disk_table.add_column("文件系统", style="white")
+                disk_table.add_column("使用量", style="green")
+                disk_table.add_column("使用率", style="yellow")
+
+                for d in disks:
+                    disk_table.add_row(
+                        d.get("path", "/"),
+                        d.get("filesystem", "-"),
+                        f"{d.get('used_human', '0')}/{d.get('total_human', '0')}",
+                        f"{d.get('percent', 0):.1f}%",
+                    )
+                console.print(disk_table)
 
             # 打印告警
             alerts = results.get("alerts", [])
@@ -270,14 +280,13 @@ def main():
   # JSON格式输出
   %(prog)s --format json
 
-  # 包含网络信息
-  %(prog)s --include-network
+  # 输出到文件
+  %(prog)s --output report.json
         """,
     )
     parser.add_argument("--server", "-s", help="指定服务器名称")
     parser.add_argument("--format", "-f", choices=["json", "table"], default="json", help="输出格式")
     parser.add_argument("--output", "-o", help="输出文件路径")
-    parser.add_argument("--include-network", "-n", action="store_true", help="包含网络信息")
     parser.add_argument("--config", "-c", help="配置文件路径")
 
     args = parser.parse_args()
@@ -301,7 +310,7 @@ def main():
 
     # 执行监控
     try:
-        results = run_monitor(manager, args.server, args.include_network)
+        results = run_monitor(manager, args.server)
     except KeyError as e:
         print(f"错误: 未找到服务器 {e}", file=sys.stderr)
         sys.exit(1)

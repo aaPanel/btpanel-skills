@@ -142,10 +142,6 @@ class BtClient:
             raise RuntimeError(f"请求失败: {e}")
 
     def get_system_status(self) -> dict:
-        """获取系统状态"""
-        return self.request(API_ENDPOINTS["SYSTEM_STATUS"])
-
-    def get_system_monitor(self) -> dict:
         """
         获取系统综合监控数据
         包含CPU、内存、磁盘、网络、负载、系统信息等
@@ -153,7 +149,7 @@ class BtClient:
         Returns:
             原始监控数据
         """
-        return self.request(API_ENDPOINTS["SYSTEM_NETWORK"])
+        return self.request(API_ENDPOINTS["SYSTEM_STATUS"])
 
     def get_service_list(self) -> list:
         """获取服务列表"""
