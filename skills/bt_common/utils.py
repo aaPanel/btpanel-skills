@@ -487,6 +487,274 @@ def format_service_status(services: list, server_name: str) -> dict:
     }
 
 
+def check_ssl_status(ssl_data) -> dict:
+    """
+    检查SSL证书状态
+
+    Args:
+        ssl_data: SSL数据（可能是dict或-1或None）
+
+    Returns:
+        SSL状态信息
+    """
+    if ssl_data == -1 or ssl_data is None:
+        return {"status": "none", "enabled": False, "message": "未配置SSL", "days_remaining": None}
+
+    if not isinstance(ssl_data, dict):
+        return {"status": "unknown", "enabled": False, "message": "SSL状态未知", "days_remaining": None}
+
+    endtime = ssl_data.get("endtime", 0)
+    if endtime is None:
+        endtime = 0
+
+    if endtime < 0:
+        return {
+            "status": "expired",
+            "enabled": True,
+            "message": f"已过期{-endtime}天",
+            "days_remaining": endtime,
+            "issuer": ssl_data.get("issuer_O", "Unknown"),
+            "not_after": ssl_data.get("notAfter", ""),
+        }
+    elif endtime <= 7:
+        return {
+            "status": "critical",
+            "enabled": True,
+            "message": f"将在{endtime}天内过期",
+            "days_remaining": endtime,
+            "issuer": ssl_data.get("issuer_O", "Unknown"),
+            "not_after": ssl_data.get("notAfter", ""),
+        }
+    elif endtime <= 30:
+        return {
+            "status": "warning",
+            "enabled": True,
+            "message": f"将在{endtime}天内过期",
+            "days_remaining": endtime,
+            "issuer": ssl_data.get("issuer_O", "Unknown"),
+            "not_after": ssl_data.get("notAfter", ""),
+        }
+    else:
+        return {
+            "status": "valid",
+            "enabled": True,
+            "message": f"剩余{endtime}天",
+            "days_remaining": endtime,
+            "issuer": ssl_data.get("issuer_O", "Unknown"),
+            "not_after": ssl_data.get("notAfter", ""),
+        }
+
+
+def parse_php_site(site: dict, server_name: str) -> dict:
+    """
+    解析PHP网站数据
+
+    Args:
+        site: 网站数据
+        server_name: 服务器名称
+
+    Returns:
+        格式化后的网站信息
+    """
+    # 判断运行状态
+    status = "running" if site.get("status") == "1" and not site.get("stop") else "stopped"
+
+    # 解析SSL
+    ssl_info = check_ssl_status(site.get("ssl"))
+
+    # 解析PHP版本
+    php_version = site.get("php_version", "")
+    if php_version in ["静态", "其它", "其他"]:
+        php_version = "static"
+
+    return {
+        "name": site.get("name", ""),
+        "server": server_name,
+        "type": "PHP",
+        "status": status,
+        "path": site.get("path", ""),
+        "domains": site.get("domain", 0),
+        "php_version": php_version,
+        "proxy": site.get("proxy", False),
+        "redirect": site.get("redirect", False),
+        "waf_enabled": site.get("waf", {}).get("status", False),
+        "backup_count": site.get("backup_count", 0),
+        "ssl": ssl_info,
+        "process": None,  # PHP项目无进程信息
+        "addtime": site.get("addtime", ""),
+        "ps": site.get("ps", ""),
+    }
+
+
+def parse_project_site(project: dict, server_name: str) -> dict:
+    """
+    解析项目类型网站数据（Java/Node/Go/Python/.NET）
+
+    Args:
+        project: 项目数据
+        server_name: 服务器名称
+
+    Returns:
+        格式化后的项目信息
+    """
+    project_type = project.get("project_type", "Unknown")
+
+    # 判断运行状态
+    # Java: pid_info存在且pid > 0, starting=True表示启动中
+    # Node/Go/NET: load_info存在且有pid, run=True
+    # Python: run=True, pids非空
+    status = "stopped"
+    process_info = None
+
+    # 检查进程信息
+    load_info = project.get("load_info", {})
+    pid_info = project.get("pid_info", {})
+    pids = project.get("pids", [])
+
+    if project_type == "Java":
+        if pid_info and pid_info.get("pid"):
+            status = "running"
+            process_info = {
+                "pid": pid_info.get("pid"),
+                "status": pid_info.get("status", "unknown"),
+                "memory_used": format_bytes(pid_info.get("memory_used", 0)),
+                "cpu_percent": pid_info.get("cpu_percent", 0),
+                "threads": pid_info.get("threads", 0),
+                "running_time": pid_info.get("running_time", 0),
+            }
+        elif project.get("starting"):
+            status = "starting"
+    elif project_type == "Python":
+        if project.get("run") or pids:
+            status = "running"
+            if pids:
+                process_info = {"pids": pids}
+    else:  # Node, Go, net
+        if project.get("run") or load_info:
+            status = "running"
+            if load_info:
+                # load_info可能有多个进程
+                first_pid = list(load_info.values())[0] if load_info else {}
+                process_info = {
+                    "pid": first_pid.get("pid"),
+                    "status": first_pid.get("status", "unknown"),
+                    "memory_used": format_bytes(first_pid.get("memory_used", 0)),
+                    "cpu_percent": first_pid.get("cpu_percent", 0),
+                    "threads": first_pid.get("threads", 0),
+                    "connects": first_pid.get("connects", 0),
+                }
+
+    # 解析SSL
+    ssl_info = check_ssl_status(project.get("ssl"))
+
+    # 获取域名
+    project_config = project.get("project_config", {})
+    domains = project_config.get("domains", [])
+
+    # 获取端口
+    port = project_config.get("port", "")
+
+    return {
+        "name": project.get("name", ""),
+        "server": server_name,
+        "type": project_type,
+        "status": status,
+        "path": project.get("path", ""),
+        "domains": len(domains) if domains else 0,
+        "domain_list": domains,
+        "port": port,
+        "ssl": ssl_info,
+        "process": process_info,
+        "addtime": project.get("addtime", ""),
+        "ps": project.get("ps", ""),
+    }
+
+
+def parse_all_sites(sites_data: list, server_name: str) -> dict:
+    """
+    解析所有网站/项目数据
+
+    Args:
+        sites_data: 网站数据列表（来自get_all_sites）
+        server_name: 服务器名称
+
+    Returns:
+        格式化后的网站汇总信息
+    """
+    sites = []
+    alerts = []
+    ssl_expiring = []
+    ssl_expired = []
+
+    for site in sites_data:
+        source = site.get("_source", "PHP")
+
+        if source == "PHP":
+            parsed = parse_php_site(site, server_name)
+        else:
+            parsed = parse_project_site(site, server_name)
+
+        sites.append(parsed)
+
+        # 检查SSL告警
+        ssl_info = parsed.get("ssl", {})
+        if ssl_info.get("status") == "expired":
+            ssl_expired.append(parsed["name"])
+            alerts.append({
+                "level": "critical",
+                "type": "ssl",
+                "message": f"网站 {parsed['name']} SSL证书已过期",
+                "site": parsed["name"],
+            })
+        elif ssl_info.get("status") == "critical":
+            ssl_expiring.append(parsed["name"])
+            alerts.append({
+                "level": "critical",
+                "type": "ssl",
+                "message": f"网站 {parsed['name']} SSL证书将在{ssl_info.get('days_remaining', 0)}天内过期",
+                "site": parsed["name"],
+            })
+        elif ssl_info.get("status") == "warning":
+            ssl_expiring.append(parsed["name"])
+            alerts.append({
+                "level": "warning",
+                "type": "ssl",
+                "message": f"网站 {parsed['name']} SSL证书将在{ssl_info.get('days_remaining', 0)}天内过期",
+                "site": parsed["name"],
+            })
+
+        # 检查运行状态告警
+        if parsed["status"] == "stopped":
+            alerts.append({
+                "level": "warning",
+                "type": "site",
+                "message": f"网站 {parsed['name']} 已停止",
+                "site": parsed["name"],
+            })
+
+    # 统计
+    by_type = {}
+    by_status = {"running": 0, "stopped": 0, "starting": 0}
+    for site in sites:
+        site_type = site.get("type", "Unknown")
+        by_type[site_type] = by_type.get(site_type, 0) + 1
+        by_status[site.get("status", "stopped")] = by_status.get(site.get("status", "stopped"), 0) + 1
+
+    return {
+        "server": server_name,
+        "timestamp": datetime.now().isoformat(),
+        "sites": sites,
+        "summary": {
+            "total": len(sites),
+            "by_type": by_type,
+            "by_status": by_status,
+            "ssl_expired": len(ssl_expired),
+            "ssl_expiring": len(ssl_expiring),
+        },
+        "alerts": alerts,
+    }
+
+
 def print_table(data: list[dict], headers: Optional[list[str]] = None) -> str:
     """
     生成表格格式的输出
