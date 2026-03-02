@@ -20,7 +20,7 @@ metadata:
 
 # 宝塔面板服务健康检查
 
-检查宝塔面板服务器的服务运行状态，包括网站、数据库、系统服务等。
+检查宝塔面板（BT-Panel）服务器的服务运行状态，包括网站、数据库、系统服务等。
 
 ## AI 使用约束
 
@@ -41,25 +41,25 @@ metadata:
 
 ```bash
 # 检查所有服务器健康状态
-python3 {baseDir}/bt-health-check/scripts/health.py
+python3 {baseDir}/scripts/health.py
 
 # 检查指定服务器
-python3 {baseDir}/bt-health-check/scripts/health.py --server prod-01
+python3 {baseDir}/scripts/health.py --server prod-01
 
 # 只检查服务
-python3 {baseDir}/bt-health-check/scripts/health.py --check-services
+python3 {baseDir}/scripts/health.py --check-services
 
 # 只检查网站
-python3 {baseDir}/bt-health-check/scripts/health.py --check-sites
+python3 {baseDir}/scripts/health.py --check-sites
 
 # 只检查数据库
-python3 {baseDir}/bt-health-check/scripts/health.py --check-databases
+python3 {baseDir}/scripts/health.py --check-databases
 
 # JSON格式输出
-python3 {baseDir}/bt-health-check/scripts/health.py --format json
+python3 {baseDir}/scripts/health.py --format json
 
 # 表格格式输出
-python3 {baseDir}/bt-health-check/scripts/health.py --format table
+python3 {baseDir}/scripts/health.py --format table
 ```
 
 ## 参数说明

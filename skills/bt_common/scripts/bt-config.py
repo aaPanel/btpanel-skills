@@ -15,8 +15,14 @@ import sys
 from pathlib import Path
 
 # 兼容开发环境和发布环境的导入
+# 开发环境: skills/bt_common/scripts/bt-config.py -> skills/
+# 发布环境: {baseDir}/scripts/bt-config.py -> {baseDir}/
 _script_root = Path(__file__).parent.parent
-if (_script_root / "skills" / "bt_common").exists():
+if (_script_root / "bt_common").exists():
+    # 发布环境: 脚本在 {baseDir}/scripts/，bt_common 在 {baseDir}/bt_common/
+    sys.path.insert(0, str(_script_root))
+elif (_script_root / "skills" / "bt_common").exists():
+    # 开发环境: 脚本在 skills/bt_common/scripts/，bt_common 在 skills/bt_common/
     sys.path.insert(0, str(_script_root / "skills"))
 else:
     sys.path.insert(0, str(_script_root))

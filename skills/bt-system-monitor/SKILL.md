@@ -41,19 +41,19 @@ metadata:
 
 ```bash
 # 监控所有服务器
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py
+python3 {baseDir}/scripts/monitor.py
 
 # 监控指定服务器
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --server prod-01
+python3 {baseDir}/scripts/monitor.py --server prod-01
 
 # JSON格式输出
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --format json
+python3 {baseDir}/scripts/monitor.py --format json
 
 # 表格格式输出
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --format table
+python3 {baseDir}/scripts/monitor.py --format table
 
 # 输出到文件
-python3 {baseDir}/bt-system-monitor/scripts/monitor.py --output report.json
+python3 {baseDir}/scripts/monitor.py --output report.json
 ```
 
 ## 参数说明
@@ -84,13 +84,13 @@ global:
 
 ```bash
 # 添加服务器
-python3 {baseDir}/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
+python3 {baseDir}/scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
 
 # 列出服务器
-python3 {baseDir}/bt-config.py list
+python3 {baseDir}/scripts/bt-config.py list
 
 # 设置阈值
-python3 {baseDir}/bt-config.py threshold --cpu 75 --memory 80
+python3 {baseDir}/scripts/bt-config.py threshold --cpu 75 --memory 80
 ```
 
 ## TODO

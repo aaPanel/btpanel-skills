@@ -41,19 +41,19 @@ metadata:
 
 ```bash
 # 检查所有服务器安全状态
-python3 {baseDir}/bt-security-check/scripts/security.py
+python3 {baseDir}/scripts/security.py
 
 # 检查指定服务器
-python3 {baseDir}/bt-security-check/scripts/security.py --server prod-01
+python3 {baseDir}/scripts/security.py --server prod-01
 
 # JSON格式输出
-python3 {baseDir}/bt-security-check/scripts/security.py --format json
+python3 {baseDir}/scripts/security.py --format json
 
 # 表格格式输出
-python3 {baseDir}/bt-security-check/scripts/security.py --format table
+python3 {baseDir}/scripts/security.py --format table
 
 # 输出到文件
-python3 {baseDir}/bt-security-check/scripts/security.py --output security-report.json
+python3 {baseDir}/scripts/security.py --output security-report.json
 ```
 
 ## 参数说明

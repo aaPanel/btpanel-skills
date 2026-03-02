@@ -151,15 +151,15 @@ def build_single_skill(skill_name: str, dist_dir: Path) -> Optional[Path]:
     # 3. 复制公共模块
     copy_common_module(output_dir)
 
-    # 4. 复制配置工具和环境检查脚本
+    # 4. 复制配置工具和环境检查脚本到 scripts 目录
     common_scripts_dir = PROJECT_ROOT / "skills" / COMMON_MODULE / "scripts"
     if common_scripts_dir.exists():
         for script_name in ["bt-config.py", "check_env.py"]:
             script_file = common_scripts_dir / script_name
             if script_file.exists():
-                shutil.copy(script_file, output_dir / script_name)
-                (output_dir / script_name).chmod(0o755)
-                print(f"  ✓ 复制工具: {script_name}")
+                shutil.copy(script_file, scripts_dir / script_name)
+                (scripts_dir / script_name).chmod(0o755)
+                print(f"  ✓ 复制工具: scripts/{script_name}")
 
     # 5. 创建配置示例
     create_config_example(output_dir)
@@ -184,10 +184,10 @@ def build_single_skill(skill_name: str, dist_dir: Path) -> Optional[Path]:
 2. 配置服务器:
    ```bash
    # 使用配置工具添加服务器
-   python3 bt-config.py add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
+   python3 scripts/bt-config.py add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
 
    # 查看配置
-   python3 bt-config.py list
+   python3 scripts/bt-config.py list
    ```
 
    或手动编辑配置文件 `~/.openclaw/bt-skills.yaml`
@@ -201,25 +201,25 @@ def build_single_skill(skill_name: str, dist_dir: Path) -> Optional[Path]:
 
 ```bash
 # 初始化配置
-python3 bt-config.py init
+python3 scripts/bt-config.py init
 
 # 列出服务器
-python3 bt-config.py list
+python3 scripts/bt-config.py list
 
 # 添加服务器
-python3 bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
+python3 scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
 
 # 更新服务器
-python3 bt-config.py update prod-01 --disabled
+python3 scripts/bt-config.py update prod-01 --disabled
 
 # 删除服务器
-python3 bt-config.py remove prod-01
+python3 scripts/bt-config.py remove prod-01
 
 # 设置阈值
-python3 bt-config.py threshold --cpu 75 --memory 80
+python3 scripts/bt-config.py threshold --cpu 75 --memory 80
 
 # 查看配置路径
-python3 bt-config.py path
+python3 scripts/bt-config.py path
 ```
 
 详细使用说明请参考 SKILL.md
