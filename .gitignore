@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+env/
+
+# uv
+.uv/
+
+# 配置文件（包含敏感信息）
+config/servers.local.yaml
+*.local.yaml
+
+# 打包输出目录（skills/ 是打包输出，忽略其中内容但保留目录）
+#skills/btpanel/
+#skills/*.zip
+
+# 日志
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# 临时文件
+tmp/
+temp/
+*.tmp

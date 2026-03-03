@@ -1,0 +1,33 @@
+# 宝塔面板服务器配置
+# 请复制此文件为 servers.local.yaml 并填入实际密钥
+
+servers:
+  # 服务器1配置
+  - name: "server-1"
+    host: "https://your-panel-1.com:8888"
+    token: "YOUR_API_TOKEN_HERE"
+    # 超时时间（毫秒）
+    timeout: 10000
+    # 是否启用
+    enabled: true
+
+  # 服务器2配置
+  - name: "server-2"
+    host: "https://your-panel-2.com:8888"
+    token: "YOUR_API_TOKEN_HERE"
+    timeout: 10000
+    enabled: true
+
+# 全局配置
+global:
+  # 请求重试次数
+  retryCount: 3
+  # 重试间隔（毫秒）
+  retryDelay: 1000
+  # 并发请求数限制
+  concurrency: 3
+  # 告警阈值配置
+  thresholds:
+    cpu: 80        # CPU使用率告警阈值(%)
+    memory: 85     # 内存使用率告警阈值(%)
+    disk: 90       # 磁盘使用率告警阈值(%)

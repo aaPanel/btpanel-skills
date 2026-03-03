@@ -1,0 +1,9 @@
+# 核心依赖
+requests>=2.28.0
+pyyaml>=6.0
+rich>=13.0.0
+
+# 开发依赖
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
