@@ -41,6 +41,8 @@ from .config import (
     remove_server,
     update_thresholds,
     get_config_info,
+    normalize_host,
+    validate_host,
 )
 from .utils import (
     Alert,
@@ -99,6 +101,8 @@ __all__ = [
     "remove_server",
     "update_thresholds",
     "get_config_info",
+    "normalize_host",
+    "validate_host",
     # 工具
     "Alert",
     "format_bytes",

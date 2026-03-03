@@ -9,9 +9,11 @@
 """
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import yaml
 
@@ -274,13 +276,81 @@ def get_thresholds(config_path: Optional[str] = None) -> ThresholdConfig:
     return config.global_config.thresholds
 
 
+def normalize_host(host: str) -> str:
+    """
+    规范化面板地址
+
+    处理用户输入的各种格式：
+    - 192.168.69.154:8888 -> https://192.168.69.154:8888
+    - 192.168.69.154:8888/soft/plugin -> https://192.168.69.154:8888
+    - panel.example.com:8888 -> https://panel.example.com:8888
+    - https://panel.example.com:8888/ -> https://panel.example.com:8888
+    - http://panel.example.com:8888 -> http://panel.example.com:8888
+
+    Args:
+        host: 用户输入的面板地址
+
+    Returns:
+        规范化后的URL
+    """
+    host = host.strip()
+
+    # 如果没有 scheme，添加 https://
+    if not host.startswith(("http://", "https://")):
+        # 检查是否以 IP 或域名开头（可能包含端口或路径）
+        host = "https://" + host
+
+    # 解析 URL
+    parsed = urlparse(host)
+
+    # 移除路径部分，只保留 scheme://netloc
+    # netloc 包含 host:port
+    normalized = f"{parsed.scheme}://{parsed.netloc}"
+
+    return normalized
+
+
+def validate_host(host: str) -> tuple[bool, str]:
+    """
+    验证面板地址
+
+    Args:
+        host: 面板地址
+
+    Returns:
+        (是否有效, 错误信息或规范化后的地址)
+    """
+    try:
+        normalized = normalize_host(host)
+        parsed = urlparse(normalized)
+
+        # 检查是否有有效的 netloc
+        if not parsed.netloc:
+            return False, "无效的面板地址：缺少主机名"
+
+        # 检查端口
+        if ":" in parsed.netloc:
+            _, port_str = parsed.netloc.rsplit(":", 1)
+            try:
+                port = int(port_str)
+                if port < 1 or port > 65535:
+                    return False, f"无效的端口号：{port}"
+            except ValueError:
+                return False, f"无效的端口号：{port_str}"
+
+        return True, normalized
+
+    except Exception as e:
+        return False, f"无效的面板地址：{str(e)}"
+
+
 def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: bool = True, config_path: Optional[str] = None) -> bool:
     """
     添加服务器配置
 
     Args:
         name: 服务器名称
-        host: 面板地址
+        host: 面板地址（自动规范化）
         token: API Token
         timeout: 超时时间
         enabled: 是否启用
@@ -288,7 +358,16 @@ def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: 
 
     Returns:
         是否添加成功
+
+    Raises:
+        ValueError: 地址格式无效
     """
+    # 规范化地址
+    is_valid, result = validate_host(host)
+    if not is_valid:
+        raise ValueError(result)
+    host = result
+
     if config_path is None:
         config_path = str(GLOBAL_CONFIG_FILE)
 

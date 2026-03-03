@@ -33,8 +33,10 @@ from bt_common import (
     find_config_file,
     get_config_info,
     load_config,
+    normalize_host,
     remove_server,
     update_thresholds,
+    validate_host,
 )
 
 
@@ -84,6 +86,16 @@ def cmd_list(args):
 def cmd_add(args):
     """添加服务器配置"""
     try:
+        # 验证并规范化地址
+        is_valid, result = validate_host(args.host)
+        if not is_valid:
+            print(f"错误: {result}", file=sys.stderr)
+            return 1
+
+        normalized_host = result
+        if normalized_host != args.host:
+            print(f"提示: 地址已规范化为 {normalized_host}")
+
         # 检查是否已存在
         config_info = get_config_info()
         existing_names = [s["name"] for s in config_info.get("servers", [])]
@@ -94,7 +106,7 @@ def cmd_add(args):
 
         result = add_server(
             name=args.name,
-            host=args.host,
+            host=normalized_host,
             token=args.token,
             timeout=args.timeout,
             enabled=not args.disabled,
@@ -102,7 +114,7 @@ def cmd_add(args):
 
         if result:
             print(f"✓ 已添加服务器: {args.name}")
-            print(f"  地址: {args.host}")
+            print(f"  地址: {normalized_host}")
             print(f"  超时: {args.timeout}ms")
             print(f"  状态: {'禁用' if args.disabled else '启用'}")
             print()
@@ -112,6 +124,9 @@ def cmd_add(args):
             print("添加失败")
             return 1
 
+    except ValueError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        return 1
     except Exception as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
