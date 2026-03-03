@@ -6,7 +6,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -33,6 +32,10 @@ env/
 config/servers.local.yaml
 *.local.yaml
 
+# 打包输出目录（skills/ 是打包输出，忽略其中内容但保留目录）
+skills/btpanel/
+skills/*.zip
+
 # 日志
 logs/
 *.log
@@ -40,6 +43,7 @@ logs/
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

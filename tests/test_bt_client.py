@@ -12,7 +12,7 @@ import pytest
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "skills"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from bt_common.bt_client import (
     API_ENDPOINTS,
@@ -431,3 +431,217 @@ class TestAPIEndpoints:
             assert endpoint.startswith("/"), f"{name} 端点应以 / 开头"
             # 部分端点使用路径形式而非action参数
             # 例如: /datalist/data/get_data_list, /project/nodejs/get_project_list
+
+    def test_project_type_endpoints(self):
+        """测试项目类型端点存在"""
+        from bt_common.api_endpoints import PROJECT_TYPES
+
+        # 测试所有项目类型都有对应的端点
+        expected_types = ["PHP", "Java", "Node", "Go", "Python", "net", "Proxy", "HTML", "Other"]
+        for ptype in expected_types:
+            assert ptype in PROJECT_TYPES, f"项目类型 {ptype} 未定义"
+            endpoint_key = PROJECT_TYPES[ptype]
+            assert endpoint_key in API_ENDPOINTS, f"端点 {endpoint_key} 不存在"
+
+        # 测试新增的反代、HTML、其他项目端点
+        assert "PROJECT_PROXY_LIST" in API_ENDPOINTS
+        assert "PROJECT_HTML_LIST" in API_ENDPOINTS
+        assert "PROJECT_OTHER_LIST" in API_ENDPOINTS
+
+
+class TestSiteParsing:
+    """测试网站解析功能"""
+
+    def test_parse_proxy_site(self):
+        """测试反代项目解析"""
+        from bt_common.utils import parse_proxy_site
+
+        proxy_data = {
+            "id": 33,
+            "name": "panel.proxy.com",
+            "path": "/usr/share/nginx/html",
+            "status": "1",
+            "ps": "nginx配置解析并添加",
+            "addtime": "2026-02-26 14:33:20",
+            "healthy": 1,
+            "waf": {"status": True},
+            "conf_path": "/www/server/panel/vhost/nginx/panel.proxy.com.conf",
+            "ssl": -1,
+            "proxy_pass": "https://127.0.0.1:8888"
+        }
+
+        result = parse_proxy_site(proxy_data, "test-server")
+
+        assert result["name"] == "panel.proxy.com"
+        assert result["type"] == "Proxy"
+        assert result["status"] == "running"
+        assert result["healthy"] is True
+        assert result["proxy_pass"] == "https://127.0.0.1:8888"
+        assert result["waf_enabled"] is True
+        assert result["ssl"]["status"] == "none"
+
+    def test_parse_proxy_site_stopped(self):
+        """测试已停止的反代项目"""
+        from bt_common.utils import parse_proxy_site
+
+        proxy_data = {
+            "name": "stopped.proxy.com",
+            "status": "0",
+            "healthy": 0,
+            "ssl": {"endtime": 30},  # 30天过期，属于warning状态
+        }
+
+        result = parse_proxy_site(proxy_data, "test-server")
+
+        assert result["status"] == "stopped"
+        assert result["healthy"] is False
+        assert result["ssl"]["status"] == "warning"  # 30天属于warning
+
+    def test_parse_html_site(self):
+        """测试HTML静态项目解析"""
+        from bt_common.utils import parse_html_site
+
+        html_data = {
+            "id": 21,
+            "name": "sdjfg.cimc",
+            "path": "/www/wwwroot/sdjfg.cimc",
+            "status": "1",
+            "ps": "sdjfg.cimc",
+            "addtime": "2026-02-24 10:20:07",
+            "project_type": "html",
+            "ssl": {"endtime": -763, "issuer_O": "Let's Encrypt"},
+        }
+
+        result = parse_html_site(html_data, "test-server")
+
+        assert result["name"] == "sdjfg.cimc"
+        assert result["type"] == "HTML"
+        assert result["status"] == "running"
+        assert result["ssl"]["status"] == "expired"
+        assert result["ssl"]["days_remaining"] == -763
+        assert result["process"] is None
+
+    def test_parse_other_site(self):
+        """测试其他项目解析"""
+        from bt_common.utils import parse_project_site
+
+        other_data = {
+            "id": 47,
+            "name": "other_go",
+            "path": "/www/wwwroot/dd/OTHER/",
+            "status": "1",
+            "project_type": "Other",
+            "project_config": {
+                "port": 17416,
+                "domains": [],
+            },
+            "run": True,
+            "load_info": {
+                "3183047": {
+                    "name": "python3",
+                    "pid": 3183047,
+                    "status": "睡眠",
+                    "memory_used": 10240000,
+                    "cpu_percent": 0.04,
+                    "threads": 4,
+                    "connects": 1,
+                }
+            },
+            "ssl": -1,
+        }
+
+        result = parse_project_site(other_data, "test-server")
+
+        assert result["name"] == "other_go"
+        assert result["type"] == "Other"
+        assert result["status"] == "running"
+        assert result["port"] == 17416
+        assert result["process"]["pid"] == 3183047
+        assert result["process"]["threads"] == 4
+
+    def test_parse_all_sites_with_new_types(self):
+        """测试包含新类型的网站解析"""
+        from bt_common.utils import parse_all_sites
+
+        sites_data = [
+            {"name": "php-site", "status": "1", "stop": "", "_source": "PHP", "ssl": -1},
+            {"name": "proxy-site", "status": "1", "healthy": 1, "_source": "Proxy", "ssl": -1, "proxy_pass": "http://example.com"},
+            {"name": "html-site", "status": "1", "_source": "HTML", "ssl": -1},
+            {"name": "other-site", "status": "1", "project_type": "Other", "_source": "Other", "run": True, "ssl": -1},
+        ]
+
+        result = parse_all_sites(sites_data, "test-server")
+
+        assert result["summary"]["total"] == 4
+        assert "PHP" in result["summary"]["by_type"]
+        assert "Proxy" in result["summary"]["by_type"]
+        assert "HTML" in result["summary"]["by_type"]
+        assert "Other" in result["summary"]["by_type"]
+
+
+class TestServiceAPI:
+    """测试服务状态API"""
+
+    def test_service_log_paths_defined(self):
+        """测试服务日志路径定义"""
+        from bt_common.api_endpoints import SERVICE_LOG_PATHS
+
+        assert "nginx" in SERVICE_LOG_PATHS
+        assert "apache" in SERVICE_LOG_PATHS
+        assert "redis" in SERVICE_LOG_PATHS
+        assert SERVICE_LOG_PATHS["nginx"] == "/www/server/nginx/logs/error.log"
+
+    def test_special_service_apis_defined(self):
+        """测试特殊服务API定义"""
+        from bt_common.api_endpoints import SPECIAL_SERVICE_APIS
+
+        assert "pgsql" in SPECIAL_SERVICE_APIS
+        assert "status" in SPECIAL_SERVICE_APIS["pgsql"]
+        assert "log" in SPECIAL_SERVICE_APIS["pgsql"]
+        assert "slow_log" in SPECIAL_SERVICE_APIS["pgsql"]
+
+    def test_software_services_defined(self):
+        """测试软件服务列表定义"""
+        from bt_common.api_endpoints import SOFTWARE_SERVICES
+
+        assert "nginx" in SOFTWARE_SERVICES
+        assert "apache" in SOFTWARE_SERVICES
+        assert "redis" in SOFTWARE_SERVICES
+        assert "memcached" in SOFTWARE_SERVICES
+        assert "pure-ftpd" in SOFTWARE_SERVICES
+
+    def test_php_versions_defined(self):
+        """测试PHP版本列表定义"""
+        from bt_common.api_endpoints import PHP_VERSIONS
+
+        assert "8.4" in PHP_VERSIONS
+        assert "8.3" in PHP_VERSIONS
+        assert "7.4" in PHP_VERSIONS
+
+    def test_new_api_endpoints(self):
+        """测试新增API端点"""
+        from bt_common.api_endpoints import API_ENDPOINTS
+
+        assert "SOFTWARE_INFO" in API_ENDPOINTS
+        assert "SOFTWARE_LIST" in API_ENDPOINTS
+        assert "FILE_BODY" in API_ENDPOINTS
+        assert API_ENDPOINTS["SOFTWARE_INFO"] == "/plugin?action=get_soft_find"
+        assert API_ENDPOINTS["FILE_BODY"] == "/files?action=GetFileBody"
+
+    def test_ssh_api_endpoints(self):
+        """测试SSH API端点"""
+        from bt_common.api_endpoints import API_ENDPOINTS
+
+        assert "SSH_INFO" in API_ENDPOINTS
+        assert "SSH_LOGS" in API_ENDPOINTS
+        assert API_ENDPOINTS["SSH_INFO"] == "/safe?action=GetSshInfo"
+        assert API_ENDPOINTS["SSH_LOGS"] == "/mod/ssh/com/get_ssh_list"
+
+    def test_crontab_api_endpoints(self):
+        """测试计划任务API端点"""
+        from bt_common.api_endpoints import API_ENDPOINTS
+
+        assert "CRONTAB_LIST" in API_ENDPOINTS
+        assert "CRONTAB_LOGS" in API_ENDPOINTS
+        assert API_ENDPOINTS["CRONTAB_LIST"] == "/crontab?action=GetCrontab"
+        assert API_ENDPOINTS["CRONTAB_LOGS"] == "/crontab?action=GetLogs"

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-宝塔面板(BT-Panel)日志巡检技能包，符合 OpenClaw/AgentSkills 规范的 Python 实现。
+宝塔面板(BT-Panel)运维监控技能包，符合 OpenClaw/AgentSkills 规范的 Python 实现。
 
 **版本要求**: 宝塔面板 >= 9.0.0, Python >= 3.10
 
@@ -22,40 +22,50 @@ ruff check .
 
 # 打包技能
 python3 scripts/build_skills.py              # 打包所有技能
-python3 scripts/build_skills.py --skill bt-system-monitor  # 打包单个技能
+python3 scripts/build_skills.py --skill btpanel  # 打包单个技能
 python3 scripts/build_skills.py --no-zip     # 只构建目录，不压缩
 
 # 环境检查
-python3 skills/bt_common/scripts/check_env.py
+python3 src/bt_common/scripts/check_env.py
 
 # 配置管理
-python3 skills/bt_common/scripts/bt-config.py init
-python3 skills/bt_common/scripts/bt-config.py list
+python3 src/btpanel/scripts/bt-config.py init
+python3 src/btpanel/scripts/bt-config.py list
+
+# 监控命令
+python3 src/btpanel/scripts/monitor.py --help
+python3 src/btpanel/scripts/sites.py --help
+python3 src/btpanel/scripts/services.py --help
 ```
 
 ## 架构
 
 ```
-skills/
-├── bt_common/              # 公共模块（所有技能共享）
+src/                        # 源码目录（开发时使用）
+├── bt_common/              # 公共模块
 │   ├── __init__.py         # 模块导出
 │   ├── api_endpoints.py    # 宝塔API端点定义
 │   ├── bt_client.py        # 宝塔API客户端 + 多服务器管理
-│   ├── config.py           # 配置管理（支持全局配置 ~/.openclaw/bt-skills.yaml）
+│   ├── config.py           # 配置管理
 │   ├── utils.py            # 工具函数
-│   └── scripts/            # 公共脚本
+│   └── scripts/
 │       ├── bt-config.py    # 配置管理CLI
 │       └── check_env.py    # 环境检查
 │
-├── bt-system-monitor/      # 系统资源监控技能
-├── bt-security-check/      # 安全事件巡检技能
-└── bt-health-check/        # 服务健康检查技能
+└── btpanel/                # 宝塔面板技能
+    ├── SKILL.md            # 技能说明
+    └── scripts/
+        ├── monitor.py      # 系统资源监控
+        ├── sites.py        # 网站状态检查
+        ├── services.py     # 服务状态检查
+        ├── logs.py         # 日志读取
+        ├── ssh.py          # SSH状态和日志
+        ├── crontab.py      # 计划任务检查
+        └── bt-config.py    # 配置管理工具
 
-每个技能目录结构：
-{skill}/
-├── SKILL.md                # 技能说明（OpenClaw规范）
-└── scripts/
-    └── {main_script}.py    # 主脚本
+skills/                     # 打包输出目录
+├── btpanel/                # 打包后的技能目录
+└── btpanel.zip             # 技能压缩包
 ```
 
 ## 关键设计
@@ -65,13 +75,13 @@ skills/
 技能脚本需要同时支持开发环境和打包后的发布环境：
 
 ```python
-# 开发环境: skills/bt_common/scripts/xxx.py -> skills/bt_common/
+# 开发环境: src/btpanel/scripts/xxx.py -> src/bt_common/
 # 发布环境: {baseDir}/scripts/xxx.py -> {baseDir}/bt_common/
 _script_root = Path(__file__).parent.parent
 if (_script_root / "bt_common").exists():
     sys.path.insert(0, str(_script_root))      # 发布环境
-elif (_script_root / "skills" / "bt_common").exists():
-    sys.path.insert(0, str(_script_root / "skills"))  # 开发环境
+elif (_script_root / "src" / "bt_common").exists():
+    sys.path.insert(0, str(_script_root / "src"))  # 开发环境
 ```
 
 ### 配置优先级
