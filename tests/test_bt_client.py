@@ -20,7 +20,7 @@ from bt_common.bt_client import (
     BtClientManager,
     sign_request,
 )
-from bt_common.config import Config, ServerConfig, ThresholdConfig, load_config
+from bt_common.config import Config, ServerConfig, ThresholdConfig, load_config, normalize_host, validate_host
 from bt_common.utils import (
     Alert,
     check_thresholds,
@@ -645,3 +645,51 @@ class TestServiceAPI:
         assert "CRONTAB_LOGS" in API_ENDPOINTS
         assert API_ENDPOINTS["CRONTAB_LIST"] == "/crontab?action=GetCrontab"
         assert API_ENDPOINTS["CRONTAB_LOGS"] == "/crontab?action=GetLogs"
+
+
+class TestHostNormalization:
+    """测试主机地址规范化"""
+
+    def test_normalize_host_add_scheme(self):
+        """测试添加默认scheme"""
+        assert normalize_host("192.168.1.1:8888") == "https://192.168.1.1:8888"
+        assert normalize_host("panel.example.com:8888") == "https://panel.example.com:8888"
+        assert normalize_host("example.com") == "https://example.com"
+
+    def test_normalize_host_remove_path(self):
+        """测试移除路径部分"""
+        assert normalize_host("192.168.69.154:8888/soft/plugin") == "https://192.168.69.154:8888"
+        assert normalize_host("panel.example.com:8888/admin/") == "https://panel.example.com:8888"
+        assert normalize_host("https://panel.example.com:8888/some/path") == "https://panel.example.com:8888"
+
+    def test_normalize_host_preserve_scheme(self):
+        """测试保留原有scheme"""
+        assert normalize_host("https://panel.example.com:8888") == "https://panel.example.com:8888"
+        assert normalize_host("http://panel.example.com:8888") == "http://panel.example.com:8888"
+
+    def test_normalize_host_remove_trailing_slash(self):
+        """测试移除尾部斜杠"""
+        assert normalize_host("https://panel.example.com:8888/") == "https://panel.example.com:8888"
+        assert normalize_host("panel.example.com:8888/") == "https://panel.example.com:8888"
+
+    def test_validate_host_valid(self):
+        """测试有效地址验证"""
+        is_valid, result = validate_host("192.168.1.1:8888")
+        assert is_valid is True
+        assert result == "https://192.168.1.1:8888"
+
+        is_valid, result = validate_host("https://panel.example.com:8888")
+        assert is_valid is True
+        assert result == "https://panel.example.com:8888"
+
+    def test_validate_host_with_path(self):
+        """测试带路径的地址验证"""
+        is_valid, result = validate_host("192.168.69.154:8888/soft/plugin")
+        assert is_valid is True
+        assert result == "https://192.168.69.154:8888"
+
+    def test_validate_host_invalid_port(self):
+        """测试无效端口"""
+        is_valid, result = validate_host("192.168.1.1:99999")
+        assert is_valid is False
+        assert "端口号" in result

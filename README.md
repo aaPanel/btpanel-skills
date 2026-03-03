@@ -174,6 +174,14 @@ metadata:
 
 ### 安装到 OpenClaw
 
+**推荐方式（首选）：通过 ClawHub 一键安装**
+
+```bash
+clawhub install btpanel
+```
+
+**手动方式（本地开发/离线场景）**
+
 ```bash
 # 复制技能目录到 OpenClaw 技能目录
 cp -r skills/btpanel ~/.openclaw/skills/
