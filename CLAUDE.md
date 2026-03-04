@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 运行测试
 python3 -m pytest tests/ -v
 python3 -m pytest tests/test_bt_client.py -v  # 运行单个测试文件
+python3 -m pytest tests/test_bt_client.py::TestHostNormalization -v  # 运行单个测试类
 
 # 代码格式化和检查
 ruff format .
@@ -27,7 +28,8 @@ python3 scripts/build_skills.py --no-zip         # 只构建目录，不压缩
 # 配置管理
 python3 src/btpanel/scripts/bt-config.py init    # 初始化配置
 python3 src/btpanel/scripts/bt-config.py list    # 列出服务器
-python3 src/btpanel/scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t TOKEN
+python3 src/btpanel/scripts/bt-config.py add -n prod-01 -H 192.168.1.1:8888 -t TOKEN
+python3 src/btpanel/scripts/bt-config.py add -n prod-01 -H "https://panel.com:8888/path" -t TOKEN  # 自动规范化
 
 # 监控脚本（开发时）
 python3 src/btpanel/scripts/monitor.py --help
@@ -46,7 +48,7 @@ src/                        # 源码目录（开发时使用）
 │   ├── __init__.py         # 模块导出
 │   ├── api_endpoints.py    # 宝塔API端点定义、服务常量
 │   ├── bt_client.py        # 宝塔API客户端 + BtClientManager多服务器管理
-│   ├── config.py           # 配置管理（支持多配置源）
+│   ├── config.py           # 配置管理、URL规范化
 │   ├── utils.py            # 工具函数（格式化、阈值检查、网站解析）
 │   └── scripts/
 │       ├── bt-config.py    # 配置管理CLI
@@ -75,11 +77,11 @@ skills/                     # 打包输出目录
 技能脚本需要同时支持开发环境和打包后的发布环境：
 
 ```python
-_skill_root = Path(__file__).parent.parent
-if (_skill_root / "bt_common").exists():
-    sys.path.insert(0, str(_skill_root))          # 发布环境: scripts/ -> bt_common/
+_script_root = Path(__file__).parent.parent
+if (_script_root / "bt_common").exists():
+    sys.path.insert(0, str(_script_root))          # 发布环境: scripts/ -> bt_common/
 else:
-    sys.path.insert(0, str(_skill_root.parent / "src"))  # 开发环境: src/bt_common/
+    sys.path.insert(0, str(_script_root.parent / "src"))  # 开发环境: src/bt_common/
 ```
 
 ### 配置优先级
@@ -88,6 +90,13 @@ else:
 2. 全局配置 `~/.openclaw/bt-skills.yaml`
 3. 本地配置 `config/servers.local.yaml`
 4. 默认配置 `config/servers.yaml`
+
+### URL规范化
+
+添加服务器时自动规范化地址：
+- `192.168.1.1:8888` → `https://192.168.1.1:8888`
+- `192.168.1.1:8888/soft/plugin` → `https://192.168.1.1:8888`（移除路径）
+- `panel.com:8888/` → `https://panel.com:8888`（移除尾部斜杠）
 
 ### 宝塔API签名
 
@@ -116,9 +125,11 @@ PHP是支持多版本共存的服务，服务名称格式：`php-X.X`（如 `php
 | mysql | 错误日志/慢日志 | API接口 |
 | pgsql | 错误日志/慢日志 | 插件API |
 
+**注意**：只有已安装的服务才能获取日志，尝试获取未安装服务的日志会返回错误。
+
 ## 测试
 
-测试文件位于 `tests/` 目录，使用 pytest。所有API端点、客户端方法、工具函数都有对应测试。
+测试文件位于 `tests/` 目录，使用 pytest。所有API端点、客户端方法、工具函数、URL规范化都有对应测试。
 
 ## 打包说明
 
