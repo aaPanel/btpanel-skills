@@ -16,20 +16,14 @@ from pathlib import Path
 
 # 兼容开发环境和发布环境的导入
 # 发布环境: bt_common/ (脚本在 scripts/)
-# 开发环境: src/bt_common/ (脚本在 src/btpanel/scripts/)
+# 开发环境: src/bt_common/ (脚本在 src/bt_common/scripts/)
 _script_root = Path(__file__).parent.parent
 if (_script_root / "bt_common").exists():
     # 发布环境: 脚本在 {baseDir}/scripts/，bt_common 在 {baseDir}/bt_common/
     sys.path.insert(0, str(_script_root))
 else:
-    # 开发环境: 脚本在 src/btpanel/scripts/，bt_common 在 src/bt_common/
-    # _script_root = src/btpanel, 需要找 src/bt_common
-    dev_src = _script_root.parent  # src/
-    if (dev_src / "bt_common").exists():
-        sys.path.insert(0, str(dev_src))
-    else:
-        # 兜底：使用项目根目录的 src
-        sys.path.insert(0, str(_script_root.parent.parent / "src"))
+    # 开发环境: 脚本在 src/bt_common/scripts/，bt_common 在 src/bt_common/
+    sys.path.insert(0, str(_script_root))
 
 from bt_common import (
     GLOBAL_CONFIG_FILE,

@@ -45,6 +45,13 @@ SKILLS = {
             "bt-config.py",
         ],
     },
+    "btpanel_files": {
+        "name": "btpanel_files",
+        "description": "宝塔面板文件管理技能，提供远程服务器文件/目录浏览、读取、编辑、创建、删除、权限管理等基本文件操作能力",
+        "scripts": [
+            "files.py",
+        ],
+    },
 }
 
 # 公共模块
@@ -160,6 +167,16 @@ def build_single_skill(skill_name: str, output_dir: Path, create_zip: bool = Tru
                 print(f"  ✗ 脚本不存在: {single_script}")
                 return None
 
+    # 2b. 复制公共脚本（bt_common/scripts 下的所有文件）
+    common_scripts_src = SRC_DIR / COMMON_MODULE / "scripts"
+    if common_scripts_src.exists():
+        common_scripts = list(common_scripts_src.glob("*.py"))
+        for script_src in common_scripts:
+            script_dst = scripts_dir / script_src.name
+            shutil.copy(script_src, script_dst)
+            script_dst.chmod(0o755)
+            print(f"  ✓ 复制公共脚本：scripts/{script_src.name}")
+
     # 3. 复制公共模块
     if not copy_common_module(skill_output_dir):
         return None
@@ -170,8 +187,58 @@ def build_single_skill(skill_name: str, output_dir: Path, create_zip: bool = Tru
     # 5. 创建 README
     scripts_list = skill_info.get("scripts", [])
     main_script = scripts_list[0] if scripts_list else "monitor.py"
+    
+    # 根据技能生成不同的 README
+    if skill_name == "btpanel_files":
+        readme_content = f"""# {skill_info['name']}
 
-    readme_content = f"""# {skill_info['name']}
+{skill_info['description']}
+
+## 版本要求
+
+- **宝塔面板**: >= 9.0.0
+- **Python**: >= 3.10
+
+## 快速开始
+
+1. 安装依赖:
+   ```bash
+   pip install requests pyyaml
+   ```
+
+2. 配置服务器:
+   ```bash
+   # 使用配置工具添加服务器
+   python3 scripts/bt-config.py add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
+   ```
+
+3. 运行:
+   ```bash
+   # 查看帮助
+   python3 scripts/{main_script} --help
+
+   # 查看目录
+   python3 scripts/{main_script} ls /www
+   ```
+
+## 可用命令
+
+| 命令 | 功能 |
+|------|------|
+| ls | 列出目录内容 |
+| cat | 读取文件内容 |
+| edit | 编辑文件内容 |
+| mkdir | 创建目录 |
+| touch | 创建文件 |
+| rm | 删除文件 |
+| rmdir | 删除目录 |
+| stat | 查看文件权限 |
+| chmod | 设置文件权限 |
+
+详细使用说明请参考 SKILL.md
+"""
+    else:
+        readme_content = f"""# {skill_info['name']}
 
 {skill_info['description']}
 
@@ -189,22 +256,12 @@ def build_single_skill(skill_name: str, output_dir: Path, create_zip: bool = Tru
 
 2. 配置服务器:
    ```bash
-   # 使用配置工具添加服务器
-   python3 scripts/bt-config.py add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
-
-   # 查看配置
-   python3 scripts/bt-config.py list
+   python3 scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t TOKEN
    ```
-
-   或手动编辑配置文件 `~/.openclaw/bt-skills.yaml`
 
 3. 运行:
    ```bash
-   # 查看帮助
    python3 scripts/{main_script} --help
-
-   # 监控所有服务器
-   python3 scripts/{main_script}
    ```
 
 ## 可用脚本
@@ -215,34 +272,9 @@ def build_single_skill(skill_name: str, output_dir: Path, create_zip: bool = Tru
 | sites.py | 网站状态检查 |
 | services.py | 服务状态检查 |
 | logs.py | 日志读取 |
-| ssh.py | SSH状态和登录日志 |
+| ssh.py | SSH 状态和登录日志 |
 | crontab.py | 计划任务检查 |
 | bt-config.py | 配置管理工具 |
-
-## 配置管理工具
-
-```bash
-# 初始化配置
-python3 scripts/bt-config.py init
-
-# 列出服务器
-python3 scripts/bt-config.py list
-
-# 添加服务器
-python3 scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
-
-# 更新服务器
-python3 scripts/bt-config.py update prod-01 --disabled
-
-# 删除服务器
-python3 scripts/bt-config.py remove prod-01
-
-# 设置阈值
-python3 scripts/bt-config.py threshold --cpu 75 --memory 80
-
-# 查看配置路径
-python3 scripts/bt-config.py path
-```
 
 详细使用说明请参考 SKILL.md
 """

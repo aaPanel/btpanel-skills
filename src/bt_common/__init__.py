@@ -63,6 +63,11 @@ from .utils import (
     output_result,
     generate_summary_report,
 )
+from .files_client import (
+    FilesClient,
+    FilesClientManager,
+    get_server_config,
+)
 
 __all__ = [
     # API端点
@@ -121,4 +126,8 @@ __all__ = [
     "print_table",
     "output_result",
     "generate_summary_report",
+    # 文件操作
+    "FilesClient",
+    "FilesClientManager",
+    "get_server_config",
 ]

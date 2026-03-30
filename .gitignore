@@ -61,3 +61,7 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+docs/
+.claude
+*.zip
+next-plan
