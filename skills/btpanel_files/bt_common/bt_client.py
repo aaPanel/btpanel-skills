@@ -154,7 +154,12 @@ class BtClient:
     def get_service_list(self) -> list:
         """获取服务列表"""
         result = self.request(API_ENDPOINTS["SERVICE_LIST"])
-        return result if isinstance(result, list) else result.get("data", [])
+        if not isinstance(result, dict):
+            return result if isinstance(result, list) else []
+        # 宝塔 API 可能返回 status=false 的错误响应
+        if result.get("status") is False:
+            return []
+        return result.get("data", [])
 
     def get_site_list(self, page: int = 1, limit: int = 100) -> list:
         """

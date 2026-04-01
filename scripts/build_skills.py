@@ -6,19 +6,13 @@
 技能打包脚本
 将技能打包为独立可用的压缩包，包含公共模块
 
-目录结构:
-- src/         : 源码目录（开发时使用）
-- skills/      : 打包输出目录（打包后存放）
+自动扫描 src 目录下的技能，无需手动定义
 """
 
 import argparse
-import os
 import shutil
-import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 # 项目根目录
@@ -30,32 +24,50 @@ SRC_DIR = PROJECT_ROOT / "src"
 # 输出目录
 OUTPUT_DIR = PROJECT_ROOT / "skills"
 
-# 技能定义
-SKILLS = {
-    "btpanel": {
-        "name": "btpanel",
-        "description": "宝塔面板(BT-Panel)运维监控技能，提供服务器资源监控、网站状态检查、服务状态检查、SSH安全审计、计划任务管理、日志读取等功能",
-        "scripts": [
-            "monitor.py",
-            "sites.py",
-            "services.py",
-            "logs.py",
-            "ssh.py",
-            "crontab.py",
-            "bt-config.py",
-        ],
-    },
-    "btpanel_files": {
-        "name": "btpanel_files",
-        "description": "宝塔面板文件管理技能，提供远程服务器文件/目录浏览、读取、编辑、创建、删除、权限管理等基本文件操作能力",
-        "scripts": [
-            "files.py",
-        ],
-    },
-}
-
 # 公共模块
 COMMON_MODULE = "bt_common"
+
+# 排除的目录（不是技能）
+EXCLUDE_DIRS = {COMMON_MODULE, "__pycache__"}
+
+
+def discover_skills() -> dict:
+    """自动扫描技能目录"""
+    skills = {}
+    
+    if not SRC_DIR.exists():
+        return skills
+    
+    for item in SRC_DIR.iterdir():
+        if not item.is_dir():
+            continue
+        if item.name in EXCLUDE_DIRS:
+            continue
+        if item.name.startswith(".") or item.name.startswith("_"):
+            continue
+        
+        # 检查是否有 SKILL.md
+        skill_md = item / "SKILL.md"
+        if not skill_md.exists():
+            print(f"  ⚠ 跳过 {item.name}：缺少 SKILL.md")
+            continue
+        
+        # 检查是否有 scripts 目录
+        scripts_dir = item / "scripts"
+        if not scripts_dir.exists():
+            print(f"  ⚠ 跳过 {item.name}：缺少 scripts 目录")
+            continue
+        
+        # 自动获取脚本列表
+        scripts = [s.name for s in scripts_dir.glob("*.py") if not s.name.startswith("_")]
+        
+        skills[item.name] = {
+            "name": item.name,
+            "scripts": scripts,
+            "src_dir": item,
+        }
+    
+    return skills
 
 
 def clean_output_dir(output_dir: Path, skill_name: str):
@@ -64,7 +76,7 @@ def clean_output_dir(output_dir: Path, skill_name: str):
     if skill_output.exists():
         shutil.rmtree(skill_output)
     skill_output.mkdir(parents=True, exist_ok=True)
-    print(f"✓ 清理并创建输出目录: {skill_output}")
+    print(f"  ✓ 清理并创建输出目录")
 
 
 def copy_common_module(target_dir: Path):
@@ -79,7 +91,6 @@ def copy_common_module(target_dir: Path):
         print(f"  ✗ 公共模块源目录不存在: {common_src}")
         return False
 
-    # 复制时排除 __pycache__ 目录
     shutil.copytree(common_src, common_dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
     print(f"  ✓ 复制公共模块: {COMMON_MODULE}/")
     return True
@@ -91,7 +102,6 @@ def copy_icons(target_dir: Path):
     icons_dst = target_dir / "icon"
 
     if not icons_src.exists():
-        print(f"  ⚠ 图标目录不存在: {icons_src}")
         return
 
     if icons_dst.exists():
@@ -102,203 +112,138 @@ def copy_icons(target_dir: Path):
     print(f"  ✓ 复制图标资源: icon/ ({len(icon_files)} 个文件)")
 
 
-def copy_scripts(scripts: list, scripts_src_dir: Path, scripts_dst_dir: Path) -> int:
-    """复制多个脚本文件"""
+def copy_scripts(scripts_dir_src: Path, scripts_dir_dst: Path) -> int:
+    """复制 scripts 目录下的所有脚本"""
+    if not scripts_dir_src.exists():
+        return 0
+    
+    scripts_dir_dst.mkdir(exist_ok=True)
+    
     copied = 0
-    for script_name in scripts:
-        script_src = scripts_src_dir / script_name
-        if script_src.exists():
-            script_dst = scripts_dst_dir / script_name
-            shutil.copy(script_src, script_dst)
-            script_dst.chmod(0o755)
-            print(f"  ✓ 复制脚本: scripts/{script_name}")
-            copied += 1
-        else:
-            print(f"  ⚠ 脚本不存在: scripts/{script_name}")
+    for script in scripts_dir_src.glob("*.py"):
+        if script.name.startswith("_"):
+            continue
+        script_dst = scripts_dir_dst / script.name
+        shutil.copy(script, script_dst)
+        script_dst.chmod(0o755)
+        copied += 1
+    
+    print(f"  ✓ 复制脚本: scripts/ ({copied} 个文件)")
     return copied
 
 
-def build_single_skill(skill_name: str, output_dir: Path, create_zip: bool = True, zip_format: str = "zip") -> Optional[Path]:
+def create_simple_readme(skill_name: str, scripts: list, target_dir: Path):
+    """创建简单的 README"""
+    main_script = scripts[0] if scripts else "main.py"
+    
+    readme_content = f"""# {skill_name}
+
+宝塔面板技能包，详细使用说明请参考 SKILL.md。
+
+## 依赖
+
+- Python >= 3.10
+- requests
+- pyyaml
+
+安装依赖：
+```bash
+pip install requests pyyaml
+```
+
+## 快速开始
+
+1. 配置服务器：
+```bash
+python3 scripts/bt-config.py add -n SERVER_NAME -H https://panel.example.com:8888 -t YOUR_TOKEN
+```
+
+2. 运行脚本：
+```bash
+python3 scripts/{main_script} --help
+```
+
+## 可用脚本
+
+| 脚本 | 说明 |
+|------|------|
+"""
+    
+    for script in scripts:
+        readme_content += f"| {script} | 参见 SKILL.md |\n"
+    
+    readme_content += f"| bt-config.py | 服务器配置管理 |\n"
+    
+    (target_dir / "README.md").write_text(readme_content, encoding="utf-8")
+    print(f"  ✓ 创建 README.md")
+
+
+def build_single_skill(skill_info: dict, output_dir: Path, create_zip: bool = True, zip_format: str = "zip") -> Path:
     """构建单个技能包"""
-    if skill_name not in SKILLS:
-        print(f"✗ 未知的技能: {skill_name}")
-        return None
-
-    skill_info = SKILLS[skill_name]
-    skill_src_dir = SRC_DIR / skill_name
-
-    if not skill_src_dir.exists():
-        print(f"✗ 技能源码目录不存在: {skill_src_dir}")
-        return None
-
+    skill_name = skill_info["name"]
+    skill_src_dir = skill_info["src_dir"]
+    
     print(f"\n构建技能: {skill_name}")
-    print(f"  描述: {skill_info['description']}")
-
+    
     # 清理并创建输出目录
     clean_output_dir(output_dir, skill_name)
     skill_output_dir = output_dir / skill_name
-
+    
     # 1. 复制 SKILL.md
     skill_md = skill_src_dir / "SKILL.md"
     if skill_md.exists():
         shutil.copy(skill_md, skill_output_dir / "SKILL.md")
         print(f"  ✓ 复制 SKILL.md")
-
-    # 2. 创建 scripts 目录并复制脚本
-    scripts_dir = skill_output_dir / "scripts"
-    scripts_dir.mkdir(exist_ok=True)
-
-    scripts_src_dir = skill_src_dir / "scripts"
+    
+    # 2. 复制 README.md（如果有）
+    readme_src = skill_src_dir / "README.md"
+    if readme_src.exists():
+        shutil.copy(readme_src, skill_output_dir / "README.md")
+        print(f"  ✓ 复制 README.md")
+    
+    # 3. 复制 scripts 目录
+    scripts_src = skill_src_dir / "scripts"
+    scripts_dst = skill_output_dir / "scripts"
     scripts = skill_info.get("scripts", [])
-
-    if scripts:
-        copied = copy_scripts(scripts, scripts_src_dir, scripts_dir)
-        if copied == 0:
-            print(f"  ✗ 没有找到任何脚本")
-            return None
-    else:
-        # 兼容旧的单脚本定义
-        single_script = skill_info.get("script")
-        if single_script:
-            script_src = scripts_src_dir / single_script
-            if script_src.exists():
-                copy_scripts([single_script], scripts_src_dir, scripts_dir)
-            else:
-                print(f"  ✗ 脚本不存在: {single_script}")
-                return None
-
-    # 2b. 复制公共脚本（bt_common/scripts 下的所有文件）
+    copy_scripts(scripts_src, scripts_dst)
+    
+    # 3b. 复制公共脚本
     common_scripts_src = SRC_DIR / COMMON_MODULE / "scripts"
     if common_scripts_src.exists():
-        common_scripts = list(common_scripts_src.glob("*.py"))
-        for script_src in common_scripts:
-            script_dst = scripts_dir / script_src.name
-            shutil.copy(script_src, script_dst)
+        for script in common_scripts_src.glob("*.py"):
+            if script.name.startswith("_"):
+                continue
+            script_dst = scripts_dst / script.name
+            shutil.copy(script, script_dst)
             script_dst.chmod(0o755)
-            print(f"  ✓ 复制公共脚本：scripts/{script_src.name}")
-
-    # 3. 复制公共模块
-    if not copy_common_module(skill_output_dir):
-        return None
-
-    # 4. 复制图标资源
-    copy_icons(skill_output_dir)
-
-    # 5. 创建 README
-    scripts_list = skill_info.get("scripts", [])
-    main_script = scripts_list[0] if scripts_list else "monitor.py"
+        print(f"  ✓ 复制公共脚本: bt_common/scripts/")
     
-    # 根据技能生成不同的 README
-    if skill_name == "btpanel_files":
-        readme_content = f"""# {skill_info['name']}
-
-{skill_info['description']}
-
-## 版本要求
-
-- **宝塔面板**: >= 9.0.0
-- **Python**: >= 3.10
-
-## 快速开始
-
-1. 安装依赖:
-   ```bash
-   pip install requests pyyaml
-   ```
-
-2. 配置服务器:
-   ```bash
-   # 使用配置工具添加服务器
-   python3 scripts/bt-config.py add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
-   ```
-
-3. 运行:
-   ```bash
-   # 查看帮助
-   python3 scripts/{main_script} --help
-
-   # 查看目录
-   python3 scripts/{main_script} ls /www
-   ```
-
-## 可用命令
-
-| 命令 | 功能 |
-|------|------|
-| ls | 列出目录内容 |
-| cat | 读取文件内容 |
-| edit | 编辑文件内容 |
-| mkdir | 创建目录 |
-| touch | 创建文件 |
-| rm | 删除文件 |
-| rmdir | 删除目录 |
-| stat | 查看文件权限 |
-| chmod | 设置文件权限 |
-
-详细使用说明请参考 SKILL.md
-"""
-    else:
-        readme_content = f"""# {skill_info['name']}
-
-{skill_info['description']}
-
-## 版本要求
-
-- **宝塔面板**: >= 9.0.0
-- **Python**: >= 3.10
-
-## 快速开始
-
-1. 安装依赖:
-   ```bash
-   pip install requests pyyaml rich
-   ```
-
-2. 配置服务器:
-   ```bash
-   python3 scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t TOKEN
-   ```
-
-3. 运行:
-   ```bash
-   python3 scripts/{main_script} --help
-   ```
-
-## 可用脚本
-
-| 脚本 | 功能 |
-|------|------|
-| monitor.py | 系统资源监控 |
-| sites.py | 网站状态检查 |
-| services.py | 服务状态检查 |
-| logs.py | 日志读取 |
-| ssh.py | SSH 状态和登录日志 |
-| crontab.py | 计划任务检查 |
-| bt-config.py | 配置管理工具 |
-
-详细使用说明请参考 SKILL.md
-"""
-    (skill_output_dir / "README.md").write_text(readme_content, encoding="utf-8")
-    print(f"  ✓ 创建 README.md")
-
-    # 6. 创建压缩包
+    # 4. 复制公共模块
+    copy_common_module(skill_output_dir)
+    
+    # 5. 复制图标资源
+    copy_icons(skill_output_dir)
+    
+    # 6. 如果没有 README.md，创建简单的
+    if not (skill_output_dir / "README.md").exists():
+        create_simple_readme(skill_name, scripts, skill_output_dir)
+    
+    # 7. 创建压缩包
     if create_zip:
         return create_archive(skill_output_dir, output_dir, zip_format)
-
+    
     return skill_output_dir
 
 
-def create_archive(skill_dir: Path, output_dir: Path, format: str = "zip") -> Optional[Path]:
+def create_archive(skill_dir: Path, output_dir: Path, format: str = "zip") -> Path:
     """创建压缩包"""
     if format == "zip":
         archive_path = shutil.make_archive(
-            str(skill_dir),  # 基础名称（不含扩展名）
+            str(skill_dir),
             "zip",
-            skill_dir.parent,  # 根目录
-            skill_dir.name,  # 要打包的目录名
+            skill_dir.parent,
+            skill_dir.name,
         )
-        print(f"  ✓ 创建压缩包: {archive_path}")
-        return Path(archive_path)
     elif format == "tar.gz":
         archive_path = shutil.make_archive(
             str(skill_dir),
@@ -306,53 +251,49 @@ def create_archive(skill_dir: Path, output_dir: Path, format: str = "zip") -> Op
             skill_dir.parent,
             skill_dir.name,
         )
-        print(f"  ✓ 创建压缩包: {archive_path}")
-        return Path(archive_path)
     else:
         print(f"  ✗ 不支持的格式: {format}")
-        return None
+        return skill_dir
+    
+    print(f"  ✓ 创建压缩包: {Path(archive_path).name}")
+    return Path(archive_path)
 
 
 def build_all_skills(output_dir: Path, create_zip: bool = True, zip_format: str = "zip") -> list:
     """构建所有技能"""
-    built_skills = []
-
-    for skill_name in SKILLS:
-        skill_dir = build_single_skill(skill_name, output_dir, create_zip, zip_format)
-        if skill_dir:
-            built_skills.append(skill_name)
-
-    return built_skills
+    skills = discover_skills()
+    
+    if not skills:
+        print("✗ 未发现任何技能")
+        return []
+    
+    print(f"发现 {len(skills)} 个技能: {', '.join(skills.keys())}")
+    
+    built = []
+    for skill_name, skill_info in skills.items():
+        try:
+            build_single_skill(skill_info, output_dir, create_zip, zip_format)
+            built.append(skill_name)
+        except Exception as e:
+            print(f"  ✗ 构建失败: {e}")
+    
+    return built
 
 
 def main():
-    """主函数"""
     parser = argparse.ArgumentParser(
-        description="宝塔面板运维监控技能打包工具",
+        description="宝塔面板技能打包工具（自动扫描技能目录）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 打包所有技能
-  python3 scripts/build_skills.py
-
-  # 打包单个技能
-  python3 scripts/build_skills.py --skill btpanel
-
-  # 打包并创建 tar.gz 格式
-  python3 scripts/build_skills.py --format tar.gz
-
-  # 只构建目录，不创建压缩包
-  python3 scripts/build_skills.py --no-zip
-
-目录结构:
-  src/         - 源码目录（开发时使用）
-  skills/      - 打包输出目录（打包后存放）
+  python3 scripts/build_skills.py              # 打包所有技能
+  python3 scripts/build_skills.py -s btpanel   # 打包单个技能
+  python3 scripts/build_skills.py --no-zip     # 只构建目录，不压缩
         """,
     )
 
     parser.add_argument(
         "--skill", "-s",
-        choices=list(SKILLS.keys()) + ["all"],
         default="all",
         help="指定要打包的技能，默认打包所有",
     )
@@ -370,35 +311,43 @@ def main():
     parser.add_argument(
         "--output", "-o",
         default=None,
-        help=f"输出目录，默认 {OUTPUT_DIR.relative_to(PROJECT_ROOT)}",
+        help="输出目录，默认 skills/",
     )
 
     args = parser.parse_args()
 
-    # 输出目录
     output_dir = Path(args.output) if args.output else OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print("=" * 60)
-    print("宝塔面板运维监控技能打包工具")
-    print("=" * 60)
+    print("=" * 50)
+    print("宝塔面板技能打包工具")
+    print("=" * 50)
     print(f"源码目录: {SRC_DIR}")
     print(f"输出目录: {output_dir}")
-    print(f"压缩格式: {args.format if not args.no_zip else '不压缩'}")
 
+    # 发现技能
+    skills = discover_skills()
+    
+    if not skills:
+        print("✗ 未发现任何技能")
+        return 1
+    
     # 构建
     if args.skill == "all":
         built = build_all_skills(output_dir, create_zip=not args.no_zip, zip_format=args.format)
+    elif args.skill in skills:
+        build_single_skill(skills[args.skill], output_dir, create_zip=not args.no_zip, zip_format=args.format)
+        built = [args.skill]
     else:
-        skill_dir = build_single_skill(args.skill, output_dir, create_zip=not args.no_zip, zip_format=args.format)
-        built = [args.skill] if skill_dir else []
+        print(f"✗ 未知的技能: {args.skill}")
+        print(f"  可用技能: {', '.join(skills.keys())}")
+        return 1
 
     # 输出结果
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 50)
     print("构建完成!")
-    print("=" * 60)
-
-    # 列出生成的文件
+    print("=" * 50)
+    
     print("\n生成的文件:")
     for item in sorted(output_dir.iterdir()):
         if item.is_dir():
@@ -414,7 +363,6 @@ def main():
             print(f"  📄 {item.name} ({size_str})")
 
     print(f"\n成功构建 {len(built)} 个技能!")
-
     return 0
 
 
