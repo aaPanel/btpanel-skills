@@ -55,6 +55,104 @@ AI: 我将为您执行以下操作：
     [展示结果和站点信息]
 ```
 
+## 🔗 技能依赖关系
+
+**本技能依赖 `btpanel` 技能的配置系统，部分功能依赖 `btpanel_files`。**
+
+### 技能包组成
+
+宝塔面板技能包包含 3 个相互关联的技能：
+
+| 技能名称 | 描述 | 依赖关系 |
+|---------|------|---------|
+| **btpanel** | 运维监控技能 | ✅ 基础技能，可独立使用 |
+| **btpanel_files** | 文件管理技能 | ⚠️ 依赖 `btpanel` 的配置系统 |
+| **btpanel_phpsite** | PHP 网站管理技能 | ⚠️ **依赖 `btpanel` 的配置系统** |
+
+### 使用前检查清单
+
+**必须安装的组件：**
+- ✅ `btpanel` 技能（提供配置系统）
+- ✅ `btpanel_files` 技能（文件操作支持）
+- ✅ `bt_common` 模块（共享模块）
+- ✅ `bt-config.py` 脚本（配置管理工具）
+
+**配置文件：**
+- ✅ `~/.openclaw/bt-skills.yaml` - 服务器配置
+- ✅ `src/bt_common/` - 共享模块目录
+
+### 功能依赖关系
+
+| 功能 | 依赖技能 | 说明 |
+|------|---------|------|
+| 站点管理 | `btpanel` | 使用配置系统连接面板 |
+| PHP 版本管理 | `btpanel` | 使用配置系统连接面板 |
+| 域名管理 | `btpanel` | 使用配置系统连接面板 |
+| SSL 证书 | `btpanel` | 使用配置系统连接面板 |
+| 伪静态管理 | `btpanel` | 使用配置系统连接面板 |
+| 文件下载 | `btpanel_files` | 使用 `download.py` |
+| 文件解压 | `btpanel_files` | 使用 `unzip.py` |
+| 配置文件编辑 | `btpanel_files` | 使用 `files.py edit` |
+
+### ⚠️ 常见问题
+
+**问题 1: 找不到 bt_common 模块**
+```
+错误：ModuleNotFoundError: No module named 'bt_common'
+解决：确保 btpanel 技能已安装，bt_common 目录存在
+```
+
+**问题 2: 配置文件不存在**
+```
+错误：未找到配置文件
+解决：运行 python3 bt-config.py add 添加服务器配置
+```
+
+**问题 3: WordPress 部署失败**
+```
+错误：无法下载或解压文件
+解决：确保 btpanel_files 技能已安装（提供 download.py 和 unzip.py）
+```
+
+**问题 4: PYTHONPATH 未设置**
+```bash
+# 运行脚本前需要设置
+export PYTHONPATH=/path/to/btpanel-skills/src:$PYTHONPATH
+```
+
+### 检查命令
+
+```bash
+# 检查 bt_common 模块
+python3 -c "from bt_common.bt_client import BtClient; print('✅ 模块正常')"
+
+# 检查配置文件
+ls -la ~/.openclaw/bt-skills.yaml
+
+# 测试站点管理
+python3 {baseDir}/scripts/site.py list --server "你的服务器名"
+
+# 测试文件管理（WordPress 部署需要）
+python3 {baseDir}/../btpanel_files/scripts/download.py --help
+```
+
+### 完整安装验证
+
+```bash
+# 1. 检查所有技能目录
+ls -la /path/to/btpanel-skills/src/
+# 应包含：btpanel/ btpanel_files/ btpanel_phpsite/ bt_common/
+
+# 2. 检查配置文件
+cat ~/.openclaw/bt-skills.yaml
+
+# 3. 测试完整流程（WordPress 部署）
+python3 {baseDir}/scripts/site.py add -n "test.com:8080" --create-db --server "你的服务器名"
+python3 {baseDir}/../btpanel_files/scripts/download.py --url "https://example.com/file.zip" --path "/tmp" --server "你的服务器名"
+```
+
+---
+
 ## 服务器配置管理
 
 > **重要:** 没有服务器信息时需要先添加
@@ -91,10 +189,10 @@ python3 {baseDir}/scripts/bt-config.py remove prod-01
 python3 {baseDir}/scripts/site.py add -n example.com -p /www/wwwroot/example.com -v 82
 
 # 创建站点并关联数据库
-python3 {baseDir}/scripts/site.py add -n example.com -v 82 --create-db -d example_db -u example_user -P "SecurePass123"
+python3 {baseDir}/scripts/site.py add -n example.com -v 82 --create-db --db-user example_user --db-password "SecurePass123"
 
 # 创建站点并同时创建 FTP
-python3 {baseDir}/scripts/site.py add -n example.com -v 82 --create-ftp -U ftpuser -P "FtpPass123"
+python3 {baseDir}/scripts/site.py add -n example.com -v 82 --create-ftp --ftp-user ftpuser --ftp-password "FtpPass123"
 ```
 
 **用户意图识别**：
@@ -235,6 +333,144 @@ python3 {baseDir}/scripts/ssl_cert.py close -n example.com
 - "上传 SSL 证书" → 执行 `ssl_cert.py upload`
 - "申请免费证书" → 执行 `ssl_cert.py apply`
 - "开启强制 HTTPS" → 执行 `ssl_cert.py https --enable`
+
+---
+
+### ⚠️ 申请免费 SSL 证书重要提示
+
+**Let's Encrypt 免费证书申请条件：**
+
+#### 1. 域名验证方式（二选一）
+
+**方式 A: HTTP 文件验证（推荐）**
+- ✅ 域名必须能正常解析到服务器 IP
+- ✅ **80 端口必须开放**（未被防火墙阻止）
+- ✅ 网站必须能正常通过 HTTP 访问
+- ✅ 验证文件需要能被 Let's Encrypt 服务器访问
+- ✅ 适合单个域名或不含通配符的多个域名
+
+**方式 B: DNS 验证**
+- ✅ 需要域名服务商支持 API 修改 DNS 记录
+- ✅ 需要提供域名服务商的 API Key/Secret
+- ✅ 适合通配符证书 (*.example.com)
+- ✅ 不需要 80 端口开放
+- ✅ **宝塔购买域名**：如果在宝塔面板购买了域名服务，使用其内置 DNS 能力，相当于已配置域名服务商 API
+- ⚠️ **配置方法**：在宝塔面板 -> 网站 -> SSL -> DNS 验证 中配置 DNS 服务商 API 凭证
+
+#### 2. 域名要求
+- ❌ **不支持 IP 地址申请证书**（Let's Encrypt 仅支持域名）
+- ❌ 不支持内网 IP（Let's Encrypt 无法访问验证）
+- ✅ 域名必须已备案（中国大陆服务器）
+- ✅ 一个证书最多包含 100 个域名
+
+#### 3. 证书限制
+- ⚠️ Let's Encrypt 证书有效期 **90 天**
+- ⚠️ 每 3 个月需要续期一次（宝塔支持自动续期）
+- ⚠️ 每周申请次数限制（约 50 次/周/域名）
+
+#### 4. 常见错误场景
+
+**错误 1: 使用 IP 地址申请**
+```
+❌ 错误：申请 IP 地址 192.168.69.172 的证书
+✅ 正确：必须使用域名，如 example.com
+```
+
+**错误 2: 域名未解析到服务器**
+```
+❌ 错误：域名解析到其他服务器
+✅ 正确：域名必须解析到当前服务器 IP
+```
+
+**错误 3: 80 端口被阻止**
+```
+❌ 错误：防火墙阻止 80 端口
+✅ 正确：开放 80 端口用于 HTTP 验证
+```
+
+**错误 4: 内网域名申请**
+```
+❌ 错误：申请 inner.local 等内网域名
+✅ 正确：使用公网可访问的域名
+```
+
+**错误 5: DNS 验证未配置**
+```
+❌ 错误：使用 DNS 验证但未配置 DNS 服务商 API
+✅ 正确：先在面板中配置 DNS 服务商 API 凭证
+```
+
+#### 5. 申请前检查清单
+
+```bash
+# 1. 检查域名解析
+ping example.com
+# 应该解析到服务器 IP
+
+# 2. 检查 80 端口
+curl -I http://example.com
+# 应该能正常访问
+
+# 3. 绑定域名到站点
+python3 {baseDir}/scripts/domain.py add -n example.com -d example.com
+
+# 4. 验证网站访问
+curl http://example.com
+# 应该返回正常内容
+```
+
+#### 6. 推荐申请流程
+
+```bash
+# 步骤 1: 绑定域名
+python3 {baseDir}/scripts/domain.py add -n example.com -d example.com,www.example.com
+
+# 步骤 2: 申请证书（HTTP 验证）
+python3 {baseDir}/scripts/ssl_cert.py apply -n example.com -d example.com,www.example.com
+
+# 步骤 3: 开启强制 HTTPS
+python3 {baseDir}/scripts/ssl_cert.py https -n example.com --enable
+
+# 步骤 4: 验证证书
+python3 {baseDir}/scripts/ssl_cert.py info -n example.com
+```
+
+**提示用户话术：**
+> "申请免费 SSL 证书需要满足以下条件：
+> 1. 使用域名（不能用 IP 地址）
+> 2. 域名已解析到当前服务器
+> 3. 80 端口开放（HTTP 验证方式）
+> 4. 如果是通配符证书或在宝塔购买了域名，可以使用 DNS 验证方式
+> 5. DNS 验证需要先在面板配置 DNS 服务商 API 凭证
+> 
+> 请问您的域名是否已解析到当前服务器？"
+
+---
+
+### 📄 证书申请日志
+
+**日志路径：** `/www/server/panel/logs/letsencrypt.log`
+
+**查看日志方法：**
+```bash
+# 手动查看
+tail -50 /www/server/panel/logs/letsencrypt.log
+
+# 或使用脚本（申请失败时自动查看）
+python3 {baseDir}/scripts/ssl_cert.py apply -n example.com -d example.com
+```
+
+**申请失败时：**
+- 脚本会自动读取日志最后 50 行
+- 过滤出错误相关的日志
+- 显示最近 10 条错误信息
+- 提供解决方案建议
+
+**常见日志错误：**
+- `Connection refused` - 80 端口未开放或域名未解析
+- `Invalid domain` - 域名格式错误
+- `DNS verification failed` - DNS 验证失败（检查 API 配置）
+- `Rate limit exceeded` - 达到申请频率限制（等待一段时间）
 
 ### 场景八：管理伪静态规则
 
@@ -528,221 +764,145 @@ python3 {baseDir}/scripts/database.py delete -d testdb
 - `EmpireCMS` - 帝国 CMS
 - `EduSoho` - EduSoho
 
-### 场景十：完整部署 WordPress 网站
+### 场景十：完整部署 WordPress 网站（实战示例）
+
+> **实战更新日期:** 2026-04-02  
+> **测试环境:** 内网 172 (192.168.69.172:8888)  
+> **WordPress 版本:** 6.9.4 (最新中文版)
 
 当用户需要从头部署一个完整的 WordPress 网站时，按以下步骤执行：
 
 #### 步骤 1：环境检查
 
-首先确认服务器已安装必要的软件：
-
 ```bash
-# 查看已安装的 PHP 版本
 python3 {baseDir}/scripts/php.py versions
-
-# 查看 MySQL 服务状态（通过 btpanel 技能）
-python3 ../btpanel/scripts/services.py -s SERVER_NAME list
+python3 {baseDir}/scripts/site.py list
 ```
-
-**预期结果**：
-- PHP 7.4 或更高版本已安装
-- MySQL/MariaDB 服务运行正常
 
 #### 步骤 2：创建站点并配置数据库
 
-创建站点时**必须明确传递 sql 和 ftp 参数**：
-
 ```bash
-# 创建站点 + 数据库（推荐同时创建 FTP 避免潜在问题）
-python3 {baseDir}/scripts/site.py add -s SERVER_NAME \
-    -n "example.com:8080" \
-    -p "/www/wwwroot/wp-site" \
+python3 {baseDir}/scripts/site.py add -s "内网 172" \
+    -n "192.168.69.172:19101" \
     -v 74 \
-    --ps "WordPress 网站" \
     --create-db \
-    --db-user "wp_db" \
-    --db-password "WpPass123!" \
-    --create-ftp \
-    --ftp-user "wp_ftp" \
-    --ftp-password "FtpPass123!"
+    --db-user "wp_db_101"
 ```
 
-**重要提示**：
-- 宝塔 API 要求明确传递 `sql` 和 `ftp` 参数（`true` 或 `false`）
-- 脚本已自动处理：默认传递 `false`，使用 `--create-db` 时改为 `true`
-- 建议同时创建 FTP，避免潜在的 API 返回错误
-
-**输出示例**：
+**输出示例：**
 ```
-✅ 站点创建成功：example.com:8080
-   路径：/www/wwwroot/wp-site
+✅ 站点创建成功：192.168.69.172:19101
+   路径：/www/wwwroot/192.168.69.172_19101
    PHP 版本：74
-   站点 ID: 15
+   站点 ID: 24
    ✅ 数据库创建成功
-      数据库名：wp_db
-      用户名：wp_db
-      密码：WpPass123!
-   ✅ FTP 创建成功
-      用户名：wp_ftp
-      密码：FtpPass123!
+      数据库名：wp_db_101
+      用户名：wp_db_101
+      密码：9q87Fbr8On41lzoT
 ```
 
 #### 步骤 3：下载 WordPress 源码
 
-使用文件管理技能下载 WordPress：
+```bash
+python3 ../btpanel_files/scripts/download.py -s "内网 172" \
+    download \
+    --url "https://cn.wordpress.org/latest-zh_CN.zip" \
+    --path "/www/wwwroot/192.168.69.172_19101" \
+    --wait \
+    --timeout 300
+```
+
+#### 步骤 4：解压到临时目录
 
 ```bash
-# 下载 WordPress 中文版（最新版本）
-python3 ../btpanel_files/scripts/download.py -s SERVER_NAME \
-    -u "https://cn.wordpress.org/latest-zh_CN.zip" \
-    -p "/www/wwwroot/wp-site/wordpress.zip"
-
-# 等待下载完成
-python3 ../btpanel_files/scripts/download.py -s SERVER_NAME \
-    -u "https://cn.wordpress.org/latest-zh_CN.zip" \
-    -p "/www/wwwroot/wp-site/wordpress.zip" \
-    --wait
+python3 ../btpanel_files/scripts/unzip.py -s "内网 172" \
+    unzip \
+    --source "/www/wwwroot/192.168.69.172_19101/latest-zh_CN.zip" \
+    --dest "/tmp/wp-extract"
 ```
 
-**下载进度示例**：
-```
-📥 开始下载: https://cn.wordpress.org/latest-zh_CN.zip
-   目标路径: /www/wwwroot/wp-site/wordpress.zip
-⏳ 下载进行中... (34.2MB / 34.4MB)
-✅ 下载完成: wordpress.zip (34.4MB)
-```
-
-#### 步骤 4：解压源码到站点目录
+#### 步骤 5：复制文件到站点根目录
 
 ```bash
-# 解压 WordPress 到站点目录
-python3 ../btpanel_files/scripts/unzip.py -s SERVER_NAME \
-    -s "/www/wwwroot/wp-site/wordpress.zip" \
-    -d "/www/wwwroot/wp-site" \
-    -t zip
-
-# 查看解压结果
-python3 ../btpanel_files/scripts/files.py -s SERVER_NAME ls -p "/www/wwwroot/wp-site"
+PYTHONPATH=/mnt/c/Work/lpanel2/btpanel-skills/src python3 -c "
+from bt_common.bt_client import BtClient
+from bt_common.config import get_servers
+servers = get_servers()
+for s in servers:
+    if s.name == '内网 172':
+        client = BtClient(name=s.name, host=s.host, token=s.token, timeout=s.timeout)
+        break
+client.request('/files?action=CopyFile', {'sfile': '/tmp/wp-extract/wordpress', 'dfile': '/www/wwwroot/192.168.69.172_19101'})
+"
 ```
 
-**解压结果示例**：
-```
-📁 /www/wwwroot/wp-site
-
-  目录:
-    📁 wordpress                         4.0MB  755    -           2026-03-13 05:00:05
-
-  文件:
-    📄 wordpress.zip                     34.4MB  644    www         2026-04-01 16:30:00
-```
-
-#### 步骤 5：调整站点路径（如需要）
-
-如果 WordPress 解压在子目录（如 `wordpress/`），需要修改站点路径：
+#### 步骤 6：配置 wp-config.php
 
 ```bash
-# 修改站点路径指向 WordPress 目录
-python3 {baseDir}/scripts/site.py -s SERVER_NAME set-path \
-    -n "example.com:8080" \
-    -p "/www/wwwroot/wp-site/wordpress"
+# 创建文件
+python3 ../btpanel_files/scripts/files.py -s "内网 172" \
+    touch "/www/wwwroot/192.168.69.172_19101/wp-config.php"
+
+# 准备配置内容
+python3 ../btpanel_files/scripts/files.py -s "内网 172" \
+    cat "/www/wwwroot/192.168.69.172_19101/wp-config-sample.php" > /tmp/wp-config.txt
+
+# 替换数据库配置
+sed -i 's/database_name_here/wp_db_101/g; s/username_here/wp_db_101/g; s/password_here/9q87Fbr8On41lzoT/g; s/localhost/127.0.0.1/g' /tmp/wp-config.txt
+
+# 写入配置
+python3 ../btpanel_files/scripts/files.py -s "内网 172" \
+    edit "/www/wwwroot/192.168.69.172_19101/wp-config.php" \
+    -f /tmp/wp-config.txt
 ```
 
-#### 步骤 6：配置伪静态规则
-
-WordPress 需要配置伪静态规则才能正常工作：
+#### 步骤 7：应用伪静态规则
 
 ```bash
-# 应用 WordPress 伪静态模板
-python3 {baseDir}/scripts/rewrite.py -s SERVER_NAME set \
-    -n "example.com:8080" \
-    -t wordpress
+python3 {baseDir}/scripts/rewrite.py -s "内网 172" \
+    set -n "192.168.69.172_19101" -t wordpress
 ```
 
-**伪静态规则示例**：
-```
-location / {
-    try_files $uri $uri/ /index.php?$query_string;
-}
-rewrite /wp-admin$ $scheme://$host$uri/ permanent;
-```
-
-#### 步骤 7：配置 SSL 证书（可选）
-
-如果需要 HTTPS 访问：
+#### 步骤 8：验证访问
 
 ```bash
-# 申请 Let's Encrypt 免费证书
-python3 {baseDir}/scripts/ssl_cert.py -s SERVER_NAME apply \
-    -n "example.com:8080" \
-    -d "example.com,www.example.com"
-
-# 开启强制 HTTPS
-python3 {baseDir}/scripts/ssl_cert.py -s SERVER_NAME https \
-    -n "example.com:8080" \
-    --enable
+curl -I http://192.168.69.172:19101
 ```
 
-#### 步骤 8：访问安装向导
-
-完成以上步骤后，向用户提供以下信息：
-
+**预期输出：**
 ```
+HTTP/1.1 302 Found
+X-Redirect-By: WordPress
+Location: http://192.168.69.172:19101/wp-admin/install.php
+```
+
+---
+
+### 部署完成信息
+
+```markdown
 ## 🎉 WordPress 部署完成！
 
-### 站点信息
 | 项目 | 值 |
 |------|------|
-| 访问地址 | http://example.com:8080 |
-| 网站路径 | /www/wwwroot/wp-site/wordpress |
-| PHP 版本 | 7.4 |
-
-### 数据库信息（安装向导填写）
-| 项目 | 值 |
-|------|------|
-| 数据库名 | wp_db |
-| 用户名 | wp_db |
-| 密码 | WpPass123! |
-| 数据库主机 | localhost |
-| 表前缀 | wp_（默认） |
-
-### FTP 信息（文件上传用）
-| 项目 | 值 |
-|------|------|
-| 用户名 | wp_ftp |
-| 密码 | FtpPass123! |
-
-### 下一步
-访问 http://example.com:8080 开始 WordPress 安装向导，
-填写以上数据库信息即可完成安装！
+| 访问地址 | http://192.168.69.172:19101 |
+| 数据库名 | wp_db_101 |
+| 用户名 | wp_db_101 |
+| 密码 | 9q87Fbr8On41lzoT |
+| 数据库主机 | 127.0.0.1 |
 ```
 
----
+### 关键注意事项
 
-**完整部署流程总结**：
+1. **数据库参数自动传递** - 脚本已自动处理 `sql=true` 参数
+2. **下载大文件使用 --wait** - 确保下载完成
+3. **解压到临时目录** - 避免子目录问题
+4. **wp-config.php 配置** - 必须正确配置数据库连接
+5. **伪静态规则必需** - WordPress 正常工作必要条件
+6. **端口选择** - 建议使用 19000+ 避免冲突
 
-| 步骤 | 命令 | 说明 |
-|------|------|------|
-| 1 | `php.py versions` | 检查 PHP 版本 |
-| 2 | `site.py add --create-db` | 创建站点和数据库 |
-| 3 | `download.py --wait` | 下载 WordPress 源码 |
-| 4 | `unzip.py` | 解压到站点目录 |
-| 5 | `site.py set-path` | 调整站点路径 |
-| 6 | `rewrite.py set -t wordpress` | 配置伪静态 |
-| 7 | `ssl_cert.py apply` | 申请 SSL 证书（可选） |
-| 8 | - | 提供安装信息给用户 |
+**相关文档:** [WordPress 部署完整示例](../../docs/wordpress-deployment-example.md)
 
-**用户意图识别**：
-- "帮我部署一个 WordPress 网站" → 按上述步骤依次执行
-- "安装 WordPress" → 按上述步骤依次执行
-- "新建一个博客网站" → 询问是否使用 WordPress，然后按步骤执行
-
-**注意事项**：
-1. 创建站点时必须明确传递 `sql` 和 `ftp` 参数
-2. 下载大文件时使用 `--wait` 参数等待完成
-3. WordPress 解压后通常在 `wordpress/` 子目录，需调整站点路径
-4. 伪静态规则是 WordPress 正常工作的必要条件
-
----
 
 ## 注意事项
 

@@ -55,6 +55,66 @@ AI: 我将为您执行以下操作：
     [展示结果和修改内容]
 ```
 
+## 🔗 技能依赖关系
+
+**本技能依赖 `btpanel` 技能的配置系统。**
+
+### 技能包组成
+
+宝塔面板技能包包含 3 个相互关联的技能：
+
+| 技能名称 | 描述 | 依赖关系 |
+|---------|------|---------|
+| **btpanel** | 运维监控技能 | ✅ 基础技能，可独立使用 |
+| **btpanel_files** | 文件管理技能 | ⚠️ **依赖 `btpanel` 的配置系统** |
+| **btpanel_phpsite** | PHP 网站管理技能 | ⚠️ 依赖 `btpanel` 的配置系统 |
+
+### 使用前检查清单
+
+**必须安装的组件：**
+- ✅ `btpanel` 技能（提供配置系统）
+- ✅ `bt_common` 模块（共享模块）
+- ✅ `bt-config.py` 脚本（配置管理工具）
+
+**配置文件：**
+- ✅ `~/.openclaw/bt-skills.yaml` - 服务器配置
+- ✅ `src/bt_common/` - 共享模块目录
+
+### ⚠️ 常见问题
+
+**问题 1: 找不到 bt_common 模块**
+```
+错误：ModuleNotFoundError: No module named 'bt_common'
+解决：确保 btpanel 技能已安装，bt_common 目录存在
+```
+
+**问题 2: 配置文件不存在**
+```
+错误：未找到配置文件
+解决：运行 python3 bt-config.py add 添加服务器配置
+```
+
+**问题 3: PYTHONPATH 未设置**
+```bash
+# 运行脚本前需要设置
+export PYTHONPATH=/path/to/btpanel-skills/src:$PYTHONPATH
+```
+
+### 检查命令
+
+```bash
+# 检查 bt_common 模块
+python3 -c "from bt_common.bt_client import BtClient; print('✅ 模块正常')"
+
+# 检查配置文件
+ls -la ~/.openclaw/bt-skills.yaml
+
+# 测试连接
+python3 {baseDir}/scripts/monitor.py --server "你的服务器名"
+```
+
+---
+
 ## 服务器配置管理
 
 > **重要:** 没有服务器信息时需要先添加
@@ -406,6 +466,8 @@ python3 {baseDir}/scripts/files.py chmod 755 /www/wwwroot -R
 5. **敏感文件**：部分系统文件可能因权限限制无法读取或修改
 
 6. **文件大小限制**：过大的文件可能导致读取/保存超时，建议分批处理
+
+7. **文件下载 API**：宝塔面板 `/files?action=DownloadFile` API 必须传递 `filename` 参数，否则返回 HTTP 500 错误。脚本已自动从 URL 提取文件名，无需手动指定
 
 ## 响应格式
 

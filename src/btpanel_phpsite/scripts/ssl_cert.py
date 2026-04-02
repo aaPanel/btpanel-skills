@@ -2,10 +2,11 @@
 # coding: utf-8
 """
 SSL 证书管理 CLI 工具
-提供 SSL 证书查询、上传、申请等功能
+提供 SSL 证书查询、上传、申请、部署等功能
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -148,24 +149,77 @@ def cmd_apply(args):
     """申请免费 SSL 证书"""
     client = get_client(args.server)
 
+    # 步骤 1: 获取站点 ID（如果未提供）
+    site_id = args.id
+    if not site_id:
+        # 使用 GetSiteDomains 获取站点信息（包含 ID）
+        endpoint = "/site?action=GetSiteDomains"
+        params = {"siteName": args.name}
+        try:
+            domains_result = client.request(endpoint, params)
+            if domains_result and isinstance(domains_result, dict):
+                site_id = str(domains_result.get('id', ''))
+        except Exception:
+            pass
+        
+        # 如果还是没找到，尝试从站点列表获取
+        if not site_id:
+            endpoint = "/site?action=GetSiteList"
+            try:
+                sites_result = client.request(endpoint, {})
+                sites = sites_result.get('data', [])
+                for site in sites:
+                    if site.get('name') == args.name:
+                        site_id = str(site.get('id'))
+                        break
+            except Exception:
+                pass
+        
+        if not site_id:
+            print(f"❌ 未找到站点：{args.name}")
+            print(f"\n💡 请使用 --id 参数指定站点 ID")
+            return 1
+        
+        print(f"📊 站点 ID: {site_id}")
+
     # 构造域名列表
     domains = args.domain.split(',') if ',' in args.domain else [args.domain]
+    
+    # 检查是否包含 IP 地址
+    import re
+    ip_pattern = re.compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+    ip_domains = [d for d in domains if ip_pattern.match(d)]
+    
+    if ip_domains:
+        print("❌ 无法为 IP 地址申请 SSL 证书")
+        print(f"   无效的域名：{', '.join(ip_domains)}")
+        print("\n⚠️  Let's Encrypt 仅支持域名申请证书，不支持 IP 地址")
+        print("\n💡 解决方案：")
+        print("   1. 使用域名代替 IP 地址")
+        print("   2. 确保域名已解析到当前服务器")
+        print("   3. 如果是通配符证书或在宝塔购买了域名，可使用 DNS 验证方式")
+        return 1
+    
     domains_json = '["' + '","'.join(domains) + '"]'
 
+    # 步骤 2: 申请证书
     endpoint = "/acme?action=apply_cert_api"
     params = {
         "domains": domains_json,
-        "id": args.id,
-        "auth_type": "http",
+        "id": site_id,
+        "auth_type": args.auth_type or "http",
         "auth_to": domains_json,
-        "auto_wildcard": 0,
+        "auto_wildcard": 1 if args.wildcard else 0,
         "ca": args.ca or "letsencrypt"
     }
 
-    print(f"🔒 正在申请 SSL 证书...")
+    print(f"\n🔒 正在申请 SSL 证书...")
+    print(f"   站点：{args.name} (ID: {site_id})")
     print(f"   域名：{', '.join(domains)}")
     print(f"   CA 机构：{args.ca or 'Let\'s Encrypt'}")
-    print(f"   验证方式：HTTP")
+    print(f"   验证方式：{args.auth_type or 'HTTP'}")
+    if args.wildcard:
+        print(f"   通配符：✅ 启用")
 
     result = client.request(endpoint, params)
 
@@ -174,9 +228,12 @@ def cmd_apply(args):
         msg = result.get('msg', '')
         if msg:
             print(f"   {msg}")
+        print(f"\n💡 提示：")
+        print(f"   证书申请成功后会自动应用到站点")
+        print(f"   可在订单列表查看进度：python3 ssl_cert.py orders -n {args.name}")
         return 0
     else:
-        print(f"\n⚠️  SSL 证书申请遇到问题")
+        print(f"\n❌ SSL 证书申请失败")
         msg = result.get('msg', '')
         if msg:
             # msg 可能是数组
@@ -185,6 +242,43 @@ def cmd_apply(args):
                     print(f"   {m}")
             else:
                 print(f"   {msg}")
+        
+        # 查看日志获取详细错误信息
+        print(f"\n🔍 正在查看申请日志...")
+        log_path = "/www/server/panel/logs/letsencrypt.log"
+        
+        try:
+            # 读取日志文件最后 50 行
+            log_endpoint = "/files?action=GetFileBody"
+            log_params = {"path": log_path}
+            log_result = client.request(log_endpoint, log_params)
+            
+            if log_result and isinstance(log_result, dict) and log_result.get('data'):
+                log_content = log_result.get('data', '')
+                log_lines = log_content.split('\n')[-50:]  # 最后 50 行
+                
+                # 过滤出错误相关日志
+                error_lines = []
+                for line in log_lines:
+                    if any(keyword in line.lower() for keyword in ['error', 'fail', 'invalid', 'timeout', 'denied']):
+                        error_lines.append(line)
+                
+                if error_lines:
+                    print(f"\n📄 日志中的错误信息:")
+                    for line in error_lines[-10:]:  # 显示最近 10 条错误
+                        print(f"   {line}")
+                
+                print(f"\n💡 解决方案:")
+                print(f"   1. 检查域名是否已解析到当前服务器")
+                print(f"   2. 检查 80 端口是否开放（HTTP 验证）")
+                print(f"   3. 检查 DNS API 配置是否正确（DNS 验证）")
+                print(f"   4. 查看完整日志：{log_path}")
+            else:
+                print(f"   ⚠️  无法读取日志文件")
+        except Exception as e:
+            print(f"   ⚠️  日志读取失败：{e}")
+        
+        print(f"\n📋 完整日志路径：{log_path}")
         return 1
 
 
@@ -192,10 +286,31 @@ def cmd_https(args):
     """设置强制 HTTPS"""
     client = get_client(args.server)
 
+    # 先检查当前 HTTPS 状态
+    print(f"🔍 检查 HTTPS 状态...")
+    ssl_endpoint = "/site?action=GetSSL"
+    ssl_params = {"siteName": args.name}
+    ssl_result = client.request(ssl_endpoint, ssl_params)
+    
+    # 处理不同的返回格式
+    https_enabled = False
+    if isinstance(ssl_result, dict):
+        https_enabled = ssl_result.get('httpTohttps', False)
+    elif isinstance(ssl_result, list) and ssl_result:
+        https_enabled = ssl_result[0].get('httpTohttps', False) if isinstance(ssl_result[0], dict) else False
+    
     if args.enable:
+        if https_enabled:
+            print(f"ℹ️  强制 HTTPS 已经开启，无需重复操作")
+            return 0
+        
         endpoint = "/site?action=HttpToHttps"
         action_msg = "已开启"
     elif args.disable:
+        if not https_enabled:
+            print(f"ℹ️  强制 HTTPS 已经关闭，无需重复操作")
+            return 0
+        
         endpoint = "/site?action=CloseToHttps"
         action_msg = "已关闭"
     else:
@@ -214,6 +329,186 @@ def cmd_https(args):
     else:
         print(f"❌ 设置失败：{result.get('msg', '未知错误')}")
         return 1
+
+
+def cmd_deploy(args):
+    """部署证书到站点"""
+    client = get_client(args.server)
+
+    print(f"\n🔐 正在部署 SSL 证书到站点：{args.name}\n")
+
+    # 步骤 1: 获取证书列表
+    print("1️⃣ 获取证书列表...")
+    cert_endpoint = "/ssl?action=get_cert_list"
+    cert_params = {"search_limit": 0, "search_name": "", "force_refresh": 0}
+    cert_result = client.request(cert_endpoint, cert_params)
+    
+    cert_list = cert_result if isinstance(cert_result, list) else cert_result.get('data', [])
+    
+    if not cert_list:
+        print("   ❌ 未找到可用证书")
+        return 1
+    
+    # 找到匹配的证书
+    target_cert = None
+    if args.domain:
+        for cert in cert_list:
+            cert_dns = cert.get('dns', [])
+            cert_dns_str = ','.join(cert_dns) if isinstance(cert_dns, list) else str(cert_dns)
+            if args.domain in cert_dns_str:
+                target_cert = cert
+                break
+    else:
+        # 使用最新证书
+        target_cert = cert_list[0] if cert_list else None
+    
+    if not target_cert:
+        print(f"   ❌ 未找到域名 {args.domain} 的证书")
+        return 1
+    
+    ssl_hash = target_cert.get('hash')
+    cert_dns = target_cert.get('dns', [])
+    cert_name = ', '.join(cert_dns) if isinstance(cert_dns, list) else str(cert_dns)
+    
+    print(f"   ✅ 找到证书：{cert_name}")
+    print(f"   SSL Hash: {ssl_hash}")
+    print(f"   有效期：{target_cert.get('notBefore', 'N/A')} ~ {target_cert.get('notAfter', 'N/A')}")
+
+    # 步骤 2: 验证证书链
+    print("\n2️⃣ 验证证书链...")
+    verify_endpoint = "/ssl/cert/verify_certificate_chain"
+    verify_params = {"ssl_hash": ssl_hash}
+    verify_result = client.request(verify_endpoint, verify_params)
+    
+    if verify_result.get('status') or isinstance(verify_result, list):
+        print("   ✅ 证书链验证通过")
+    else:
+        print(f"   ⚠️  证书链验证跳过：{verify_result.get('msg', '')}")
+
+    # 步骤 3: 应用证书到站点
+    print("\n3️⃣ 应用证书到站点...")
+    deploy_endpoint = "/ssl?action=SetBatchCertToSite"
+    batch_info = [{
+        "ssl_hash": ssl_hash,
+        "siteName": args.name,
+        "certName": cert_name
+    }]
+    deploy_params = {"BatchInfo": json.dumps(batch_info)}
+    deploy_result = client.request(deploy_endpoint, deploy_params)
+    
+    # 检查部署结果（支持不同的返回格式）
+    deploy_success = False
+    if deploy_result.get('status'):
+        deploy_success = True
+    elif deploy_result.get('success', 0) > 0:
+        deploy_success = True
+    
+    if deploy_success:
+        print(f"   ✅ 证书部署成功")
+    else:
+        print(f"   ❌ 证书部署失败：{deploy_result.get('msg', '')}")
+        return 1
+
+    # 步骤 4: 启用 HTTPS（先检查状态）
+    print("\n4️⃣ 检查并启用 HTTPS...")
+    ssl_check_endpoint = "/site?action=GetSSL"
+    ssl_check_params = {"siteName": args.name}
+    ssl_check_result = client.request(ssl_check_endpoint, ssl_check_params)
+    
+    https_enabled = False
+    if isinstance(ssl_check_result, dict):
+        https_enabled = ssl_check_result.get('httpTohttps', False)
+    elif isinstance(ssl_check_result, list) and ssl_check_result:
+        https_enabled = ssl_check_result[0].get('httpTohttps', False) if isinstance(ssl_check_result[0], dict) else False
+    
+    if https_enabled:
+        print(f"   ℹ️  HTTPS 已经启用，跳过")
+    else:
+        https_endpoint = "/site?action=HttpToHttps"
+        https_params = {"siteName": args.name}
+        https_result = client.request(https_endpoint, https_params)
+        
+        if https_result.get('status'):
+            print(f"   ✅ HTTPS 已启用")
+        else:
+            print(f"   ⚠️  HTTPS 启用失败：{https_result.get('msg', '')}")
+
+    print(f"\n🎉 证书部署完成！")
+    print(f"   域名：{cert_name}")
+    print(f"   站点：{args.name}")
+    return 0
+
+
+def cmd_orders(args):
+    """查看证书申请订单列表"""
+    client = get_client(args.server)
+
+    # 同时查询 ACME 和 SSL 订单
+    print(f"\n📋 SSL 证书订单列表：{args.name}\n")
+    
+    # ACME 订单
+    acme_endpoint = "/acme?action=get_order_list"
+    acme_params = {
+        "siteName": args.name,
+        "status_id": args.status
+    }
+    acme_result = client.request(acme_endpoint, acme_params)
+    
+    # 处理不同的返回格式
+    if isinstance(acme_result, list):
+        acme_orders = acme_result
+    elif isinstance(acme_result, dict):
+        acme_orders = acme_result.get('data', [])
+    else:
+        acme_orders = []
+    if acme_orders:
+        print("🔐 ACME 证书订单:")
+        for order in acme_orders:
+            status = order.get('status', 0)
+            status_text = {
+                0: "⏳ 待验证",
+                1: "✅ 已签发",
+                2: "❌ 已失败",
+                3: "🔄 续期中"
+            }.get(status, f"未知 ({status})")
+            
+            domains = order.get('domains', [])
+            domain_str = ', '.join(domains) if isinstance(domains, list) else str(domains)
+            
+            print(f"\n   域名：{domain_str}")
+            print(f"   状态：{status_text}")
+            print(f"   CA: {order.get('ca_name', 'Unknown')}")
+            print(f"   时间：{order.get('addtime', 'N/A')}")
+            if order.get('msg'):
+                print(f"   消息：{order.get('msg')}")
+        print()
+    
+    # SSL 订单
+    ssl_endpoint = "/ssl?action=get_order_list"
+    ssl_params = {
+        "siteName": args.name
+    }
+    ssl_result = client.request(ssl_endpoint, ssl_params)
+    
+    # 处理不同的返回格式
+    if isinstance(ssl_result, list):
+        ssl_orders = ssl_result
+    elif isinstance(ssl_result, dict):
+        ssl_orders = ssl_result.get('data', [])
+    else:
+        ssl_orders = []
+    if ssl_orders:
+        print("🔐 SSL 证书订单:")
+        for order in ssl_orders:
+            print(f"\n   域名：{order.get('domain', 'N/A')}")
+            print(f"   状态：{order.get('status', 'N/A')}")
+            print(f"   时间：{order.get('addtime', 'N/A')}")
+        print()
+    
+    if not acme_orders and not ssl_orders:
+        print("   暂无证书订单")
+    
+    return 0
 
 
 def cmd_close(args):
@@ -267,8 +562,22 @@ def main():
     apply_parser.add_argument('-n', '--name', required=True, help='站点域名')
     apply_parser.add_argument('-d', '--domain', required=True, help='域名（多个用逗号分隔）')
     apply_parser.add_argument('--id', type=int, help='站点 ID')
-    apply_parser.add_argument('--ca', choices=['letsencrypt', 'litessl'], help='CA 机构')
+    apply_parser.add_argument('--ca', choices=['letsencrypt', 'litessl'], default='letsencrypt', help='CA 机构')
+    apply_parser.add_argument('--auth-type', choices=['http', 'dns'], default='http', help='验证方式')
+    apply_parser.add_argument('--wildcard', action='store_true', help='申请通配符证书')
     apply_parser.set_defaults(func=cmd_apply)
+
+    # orders 命令
+    orders_parser = subparsers.add_parser('orders', help='查看证书申请订单列表')
+    orders_parser.add_argument('-n', '--name', required=True, help='站点域名')
+    orders_parser.add_argument('--status', type=int, default=-1, help='状态筛选')
+    orders_parser.set_defaults(func=cmd_orders)
+
+    # deploy 命令
+    deploy_parser = subparsers.add_parser('deploy', help='部署证书到站点')
+    deploy_parser.add_argument('-n', '--name', required=True, help='站点域名')
+    deploy_parser.add_argument('-d', '--domain', help='指定域名（不指定则自动匹配最新证书）')
+    deploy_parser.set_defaults(func=cmd_deploy)
 
     # https 命令
     https_parser = subparsers.add_parser('https', help='设置强制 HTTPS')

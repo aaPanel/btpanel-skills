@@ -116,7 +116,12 @@ def cmd_get(args):
 
     result = client.request(endpoint, params)
 
-    if not result.get('status') and not result.get('only_read') == False:
+    # 检查 API 返回
+    if not result:
+        print("获取伪静态规则失败：返回数据为空")
+        return 1
+
+    if isinstance(result, dict) and result.get('status') is False:
         print(f"获取伪静态规则失败：{result.get('msg', '未知错误')}")
         return 1
 
@@ -136,8 +141,14 @@ def cmd_set(args):
 
     if args.template:
         # 应用模板
-        # 先获取模板内容
-        template_path = f"/www/server/panel/rewrite/{args.template}.conf"
+        # 先获取面板配置，确定 Web 服务器类型（nginx/apache）
+        config_endpoint = "/panel/public/get_public_config"
+        config_result = client.request(config_endpoint)
+        
+        webserver = config_result.get('webserver', 'nginx').lower()
+        
+        # 根据 Web 服务器类型构建模板路径
+        template_path = f"/www/server/panel/rewrite/{webserver}/{args.template}.conf"
 
         endpoint = "/files?action=GetFileBody"
         params = {
@@ -148,6 +159,7 @@ def cmd_set(args):
 
         if not template_result.get('status'):
             print(f"获取模板内容失败：{template_result.get('msg', '未知错误')}")
+            print(f"模板路径：{template_path}")
             return 1
 
         content = template_result.get('data', '')

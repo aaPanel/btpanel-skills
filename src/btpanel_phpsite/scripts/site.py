@@ -365,6 +365,33 @@ def cmd_info(args):
     return 0
 
 
+def cmd_set_path(args):
+    """修改站点路径"""
+    client = get_client(args.server)
+
+    # 获取站点 ID
+    site_id = args.id or get_site_id(client, args.name)
+    if not site_id:
+        print(f"❌ 未找到站点：{args.name}")
+        return 1
+
+    endpoint = "/site?action=SetPath"
+    params = {
+        "id": site_id,
+        "path": args.path
+    }
+
+    result = client.request(endpoint, params)
+
+    if result.get('status'):
+        print(f"✅ 站点路径已修改：{args.name}")
+        print(f"   新路径：{args.path}")
+        return 0
+    else:
+        print(f"❌ 修改失败：{result.get('msg', '未知错误')}")
+        return 1
+
+
 def _generate_password(length=16):
     """生成随机密码"""
     import random
@@ -431,6 +458,13 @@ def main():
     info_parser = subparsers.add_parser('info', help='查看站点详情')
     info_parser.add_argument('-n', '--name', required=True, help='站点域名')
     info_parser.set_defaults(func=cmd_info)
+
+    # set-path 命令
+    set_path_parser = subparsers.add_parser('set-path', help='修改站点路径')
+    set_path_parser.add_argument('-n', '--name', required=True, help='站点域名')
+    set_path_parser.add_argument('-p', '--path', required=True, help='新的站点路径')
+    set_path_parser.add_argument('-i', '--id', type=int, help='站点 ID')
+    set_path_parser.set_defaults(func=cmd_set_path)
 
     args = parser.parse_args()
 

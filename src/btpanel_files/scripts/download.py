@@ -81,20 +81,30 @@ def cmd_download(args):
     """下载文件"""
     client = get_client(args.server)
     
+    # 自动提取文件名（如果未指定）
+    filename = args.filename
+    if not filename:
+        # 使用 urllib 解析 URL
+        from urllib.parse import urlparse
+        parsed = urlparse(args.url)
+        # 从 path 中提取文件名
+        path_parts = parsed.path.rstrip('/').split('/')
+        filename = path_parts[-1] if path_parts and path_parts[-1] else 'downloaded_file'
+    
     # 1. 发起下载请求
     print(f"\n📥 开始下载文件...")
     print(f"   URL: {args.url}")
     print(f"   目标路径: {args.path}")
-    print(f"   文件名: {args.filename or '自动命名'}")
+    print(f"   文件名: {filename}")
     print()
     
     endpoint = "/files?action=DownloadFile"
+    # 注意：filename 是必传参数，否则 API 返回 500
     params = {
         "url": args.url,
         "path": args.path,
+        "filename": filename,  # 必传！
     }
-    if args.filename:
-        params["filename"] = args.filename
     
     try:
         result = client.request(endpoint, params)
@@ -193,7 +203,7 @@ def cmd_download(args):
                 print()  # 换行
                 print("-" * 60)
                 print(f"✅ 下载完成！")
-                print(f"   文件: {args.path}/{args.filename or '自动命名'}")
+                print(f"   文件: {args.path}/{filename}")
                 print(f"   大小: {format_size(total) if total else '未知'}")
                 print(f"   耗时: {format_time(int(elapsed))}")
                 return 0
@@ -316,7 +326,7 @@ def main():
     download_parser = subparsers.add_parser('download', help='下载文件')
     download_parser.add_argument('--url', required=True, help='下载 URL')
     download_parser.add_argument('--path', required=True, help='目标路径')
-    download_parser.add_argument('--filename', help='保存文件名（可选）')
+    download_parser.add_argument('--filename', help='保存文件名（可选，默认从 URL 提取）')
     download_parser.add_argument('--wait', action='store_true', help='等待下载完成')
     download_parser.add_argument('--timeout', type=int, default=600, help='超时时间（秒，默认 600）')
     download_parser.set_defaults(func=cmd_download)

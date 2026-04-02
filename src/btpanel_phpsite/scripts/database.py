@@ -447,14 +447,8 @@ def main():
     list_parser = subparsers.add_parser('list', help='列出所有数据库')
     list_parser.set_defaults(func=cmd_list)
 
-    # add 命令
-    add_parser = subparsers.add_parser('add', help='创建数据库')
-    add_parser.add_argument('-n', '--name', required=True, help='数据库名称')
-    add_parser.add_argument('-u', '--user', help='数据库用户名')
-    add_parser.add_argument('-P', '--password', help='数据库密码')
-    add_parser.add_argument('--access', default='127.0.0.1', help='访问权限')
-    add_parser.add_argument('--encoding', default='utf8', help='数据库编码')
-    add_parser.add_argument('--ps', help='备注说明')
+    # add 命令（已禁用，保留帮助提示）
+    add_parser = subparsers.add_parser('add', help='创建数据库（已禁用，请在创建站点时创建）')
     add_parser.set_defaults(func=cmd_add)
 
     # info 命令

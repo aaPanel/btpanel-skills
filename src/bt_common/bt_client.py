@@ -129,7 +129,8 @@ class BtClient:
             data = response.json()
 
             # 检查宝塔API响应状态
-            if data.get("status") is False:
+            # 注意：某些 API 返回的是列表而不是字典
+            if isinstance(data, dict) and data.get("status") is False:
                 raise RuntimeError(data.get("msg", "API请求失败"))
 
             return data

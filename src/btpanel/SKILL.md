@@ -73,6 +73,57 @@ AI: 我将为您执行以下操作：
     [展示结果和分析]
 ```
 
+## 🔗 技能依赖关系
+
+**本技能是基础技能，可独立使用。**
+
+### 技能包组成
+
+宝塔面板技能包包含 3 个相互关联的技能：
+
+| 技能名称 | 描述 | 依赖关系 |
+|---------|------|---------|
+| **btpanel** | 运维监控技能 | ✅ 基础技能，可独立使用 |
+| **btpanel_files** | 文件管理技能 | ⚠️ 依赖 `btpanel` 的配置系统 |
+| **btpanel_phpsite** | PHP 网站管理技能 | ⚠️ 依赖 `btpanel` 的配置系统 |
+
+### 完整功能需要安装的组件
+
+**最小安装（仅监控）：**
+- ✅ `btpanel` - 可独立使用，提供服务器监控功能
+
+**标准安装（推荐）：**
+- ✅ `btpanel` - 基础监控
+- ✅ `btpanel_files` - 文件管理
+- ⚠️ 这两个技能共享配置系统，需要确保 `bt-config.py` 可用
+
+**完整安装（PHP 网站管理）：**
+- ✅ `btpanel` - 基础监控
+- ✅ `btpanel_files` - 文件管理
+- ✅ `btpanel_phpsite` - PHP 网站管理
+- ⚠️ 三个技能共享配置系统，需要确保 `bt-config.py` 可用
+
+### ⚠️ 重要提示
+
+**如果技能没有完整安装：**
+1. 确保 `bt_common` 模块已安装（所有技能共享）
+2. 确保 `bt-config.py` 脚本可用（配置管理工具）
+3. 确保 `~/.openclaw/bt-skills.yaml` 配置文件存在
+
+**检查方法：**
+```bash
+# 检查 bt_common 模块
+python3 -c "from bt_common.bt_client import BtClient; print('✅ bt_common 已安装')"
+
+# 检查配置文件
+ls -la ~/.openclaw/bt-skills.yaml
+
+# 检查配置工具
+python3 {baseDir}/scripts/bt-config.py --help
+```
+
+---
+
 ## 服务器配置管理
 > **重要:** 没有服务器信息时需要添加
 
