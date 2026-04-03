@@ -43,7 +43,8 @@ def get_server_config(server_name: str = None) -> Optional[Dict]:
                         'host': server.host,
                         'token': server.token,
                         'timeout': server.timeout,
-                        'enabled': server.enabled
+                        'enabled': server.enabled,
+                        'verify_ssl': server.verify_ssl if hasattr(server, 'verify_ssl') else True
                     }
                 return server
         return None
@@ -60,7 +61,8 @@ def get_server_config(server_name: str = None) -> Optional[Dict]:
                     'host': server.host,
                     'token': server.token,
                     'timeout': server.timeout,
-                    'enabled': server.enabled
+                    'enabled': server.enabled,
+                    'verify_ssl': server.verify_ssl if hasattr(server, 'verify_ssl') else True
                 }
             return server
 
@@ -91,7 +93,8 @@ class FilesClient:
                 name=config.get('name', self.server_name),
                 host=config['host'],
                 token=config['token'],
-                timeout=config.get('timeout', 10000)
+                timeout=config.get('timeout', 10000),
+                verify_ssl=config.get('verify_ssl', True)
             )
         else:
             # 使用默认服务器

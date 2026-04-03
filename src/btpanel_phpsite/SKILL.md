@@ -55,66 +55,33 @@ AI: 我将为您执行以下操作：
     [展示结果和站点信息]
 ```
 
-## 🔗 技能依赖关系
+## 宝塔面板相关技能矩阵
 
-**本技能依赖 `btpanel` 技能的配置系统，部分功能依赖 `btpanel_files`。**
+当前宝塔面板技能包，共包含 3 个相互关联的技能：
 
-### 技能包组成
-
-宝塔面板技能包包含 3 个相互关联的技能：
-
-| 技能名称 | 描述 | 依赖关系 |
-|---------|------|---------|
-| **btpanel** | 运维监控技能 | ✅ 基础技能，可独立使用 |
-| **btpanel_files** | 文件管理技能 | ⚠️ 依赖 `btpanel` 的配置系统 |
-| **btpanel_phpsite** | PHP 网站管理技能 | ⚠️ **依赖 `btpanel` 的配置系统** |
-
-### 使用前检查清单
-
-**必须安装的组件：**
-- ✅ `btpanel` 技能（提供配置系统）
-- ✅ `btpanel_files` 技能（文件操作支持）
-- ✅ `bt_common` 模块（共享模块）
-- ✅ `bt-config.py` 脚本（配置管理工具）
-
-**配置文件：**
-- ✅ `~/.openclaw/bt-skills.yaml` - 服务器配置
-- ✅ `src/bt_common/` - 共享模块目录
-
-### 功能依赖关系
-
-| 功能 | 依赖技能 | 说明 |
-|------|---------|------|
-| 站点管理 | `btpanel` | 使用配置系统连接面板 |
-| PHP 版本管理 | `btpanel` | 使用配置系统连接面板 |
-| 域名管理 | `btpanel` | 使用配置系统连接面板 |
-| SSL 证书 | `btpanel` | 使用配置系统连接面板 |
-| 伪静态管理 | `btpanel` | 使用配置系统连接面板 |
-| 文件下载 | `btpanel_files` | 使用 `download.py` |
-| 文件解压 | `btpanel_files` | 使用 `unzip.py` |
-| 配置文件编辑 | `btpanel_files` | 使用 `files.py edit` |
+| 技能名称                | 描述 | 依赖关系                              |
+|---------------------|------|-----------------------------------|
+| **btpanel**         | 运维监控技能 | ✅ 基础技能，主要用于资源监控、网站状态检查、服务状态检查等    |
+| **btpanel-files**   | 文件管理技能 | ✅ 提供远程服务器文件辅助服务，可以读取文件列表和内容       |
+| **btpanel-phpsite** | PHP 网站管理技能 | ✅ 提供远程服务器 PHP 网站管理功能，能够部署和管理php网站 |
 
 ### ⚠️ 常见问题
 
-**问题 1: 找不到 bt_common 模块**
-```
-错误：ModuleNotFoundError: No module named 'bt_common'
-解决：确保 btpanel 技能已安装，bt_common 目录存在
 ```
 
-**问题 2: 配置文件不存在**
+**问题 1: 配置文件不存在**
 ```
 错误：未找到配置文件
 解决：运行 python3 bt-config.py add 添加服务器配置
 ```
 
-**问题 3: WordPress 部署失败**
+**问题 2: WordPress 部署失败**
 ```
 错误：无法下载或解压文件
-解决：确保 btpanel_files 技能已安装（提供 download.py 和 unzip.py）
+解决：确保 btpanel-files 技能已安装，提供文件操作能力
 ```
 
-**问题 4: PYTHONPATH 未设置**
+**问题 3: PYTHONPATH 未设置**
 ```bash
 # 运行脚本前需要设置
 export PYTHONPATH=/path/to/btpanel-skills/src:$PYTHONPATH
@@ -177,6 +144,22 @@ python3 {baseDir}/scripts/bt-config.py remove prod-01
 1. 登录宝塔面板
 2. 进入「面板设置」->「API 接口」
 3. 点击「获取 API Token」
+
+**重要提示 - SSL 证书验证配置**：
+添加服务器时，AI 应询问用户：
+> "您的宝塔面板是否使用了受信任的 SSL 证书（如 Let's Encrypt、商业 CA 证书）？"
+
+- ✅ **是**（受信任证书）→ 使用默认配置，无需额外参数
+- ⚠️ **否**（自签名证书）→ 添加 `--verify-ssl false` 参数
+
+**示例**：
+```bash
+# 自签名证书场景
+python3 {baseDir}/scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN --verify-ssl false
+
+# 受信任证书场景（默认）
+python3 {baseDir}/scripts/bt-config.py add -n prod-01 -H https://panel.example.com:8888 -t YOUR_TOKEN
+```
 
 ## 常用场景
 
@@ -900,8 +883,6 @@ Location: http://192.168.69.172:19101/wp-admin/install.php
 4. **wp-config.php 配置** - 必须正确配置数据库连接
 5. **伪静态规则必需** - WordPress 正常工作必要条件
 6. **端口选择** - 建议使用 19000+ 避免冲突
-
-**相关文档:** [WordPress 部署完整示例](../../docs/wordpress-deployment-example.md)
 
 
 ## 注意事项

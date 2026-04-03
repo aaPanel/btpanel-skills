@@ -65,8 +65,10 @@ def cmd_list(args):
         print("-" * 60)
         for server in servers:
             status = "✓" if server.get("enabled", True) else "✗"
+            verify_ssl = "✓" if server.get("verify_ssl", True) else "✗"
             print(f"  [{status}] {server['name']}")
             print(f"       地址: {server['host']}")
+            print(f"       SSL验证: [{verify_ssl}]")
         print()
 
         thresholds = config_info.get("thresholds", {})
@@ -104,12 +106,16 @@ def cmd_add(args):
             print(f"错误: 服务器 '{args.name}' 已存在，使用 --force 覆盖")
             return 1
 
+        # 确定 SSL 验证设置
+        verify_ssl = args.verify_ssl if args.verify_ssl is not None else True
+
         result = add_server(
             name=args.name,
             host=normalized_host,
             token=args.token,
             timeout=args.timeout,
             enabled=not args.disabled,
+            verify_ssl=verify_ssl,
         )
 
         if result:
@@ -117,6 +123,7 @@ def cmd_add(args):
             print(f"  地址: {normalized_host}")
             print(f"  超时: {args.timeout}ms")
             print(f"  状态: {'禁用' if args.disabled else '启用'}")
+            print(f"  SSL验证: {'启用' if verify_ssl else '禁用'}")
             print()
             print(f"配置文件: {GLOBAL_CONFIG_FILE}")
             return 0
@@ -170,6 +177,7 @@ def cmd_update(args):
         new_token = args.token if args.token else existing.get("token", "")
         new_timeout = args.timeout if args.timeout else existing.get("timeout", 10000)
         new_enabled = not args.disabled if args.disabled is not None else existing.get("enabled", True)
+        new_verify_ssl = args.verify_ssl if args.verify_ssl is not None else existing.get("verify_ssl", True)
 
         # 删除旧的，添加新的
         remove_server(args.name)
@@ -179,12 +187,14 @@ def cmd_update(args):
             token=new_token,
             timeout=new_timeout,
             enabled=new_enabled,
+            verify_ssl=new_verify_ssl,
         )
 
         print(f"✓ 已更新服务器: {args.name}")
         print(f"  地址: {new_host}")
         print(f"  超时: {new_timeout}ms")
         print(f"  状态: {'禁用' if not new_enabled else '启用'}")
+        print(f"  SSL验证: {'启用' if new_verify_ssl else '禁用'}")
         return 0
 
     except Exception as e:
@@ -293,14 +303,20 @@ def main():
   # 列出所有服务器
   bt-config list
 
-  # 添加服务器
+  # 添加服务器（默认启用 SSL 验证）
   bt-config add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN
+
+  # 添加服务器（禁用 SSL 验证，用于自签名证书）
+  bt-config add --name prod-01 --host https://panel.example.com:8888 --token YOUR_TOKEN --verify-ssl false
 
   # 更新服务器
   bt-config update prod-01 --host https://new.example.com:8888
 
   # 禁用服务器
   bt-config update prod-01 --disabled
+
+  # 更新 SSL 验证设置
+  bt-config update prod-01 --verify-ssl false
 
   # 删除服务器
   bt-config remove prod-01
@@ -330,6 +346,7 @@ def main():
     add_parser.add_argument("--timeout", type=int, default=10000, help="超时时间(毫秒)，默认 10000")
     add_parser.add_argument("--disabled", action="store_true", help="禁用此服务器")
     add_parser.add_argument("--force", "-f", action="store_true", help="强制覆盖已存在的配置")
+    add_parser.add_argument("--verify-ssl", type=lambda x: x.lower() in ("true", "1", "yes"), default=None, help="是否验证 SSL 证书 (true/false)，默认 true")
 
     # remove 命令
     remove_parser = subparsers.add_parser("remove", help="删除服务器配置")
@@ -342,6 +359,7 @@ def main():
     update_parser.add_argument("--token", "-t", help="API Token")
     update_parser.add_argument("--timeout", type=int, help="超时时间(毫秒)")
     update_parser.add_argument("--disabled", type=lambda x: x.lower() in ("true", "1", "yes"), help="是否禁用 (true/false)")
+    update_parser.add_argument("--verify-ssl", type=lambda x: x.lower() in ("true", "1", "yes"), default=None, help="是否验证 SSL 证书 (true/false)")
 
     # threshold 命令
     threshold_parser = subparsers.add_parser("threshold", help="设置告警阈值")

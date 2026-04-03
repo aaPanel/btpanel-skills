@@ -34,13 +34,15 @@ def get_client(server_name: str = None):
                     'name': server.name if hasattr(server, 'name') else server.get('name'),
                     'host': server.host if hasattr(server, 'host') else server.get('host'),
                     'token': server.token if hasattr(server, 'token') else server.get('token'),
-                    'timeout': server.timeout if hasattr(server, 'timeout') else server.get('timeout', 10000)
+                    'timeout': server.timeout if hasattr(server, 'timeout') else server.get('timeout', 10000),
+                    'verify_ssl': server.verify_ssl if hasattr(server, 'verify_ssl') else server.get('verify_ssl', True)
                 }
                 return BtClient(
                     name=config['name'],
                     host=config['host'],
                     token=config['token'],
-                    timeout=config['timeout']
+                    timeout=config['timeout'],
+                    verify_ssl=config['verify_ssl']
                 )
         raise ValueError(f"未找到服务器：{server_name}")
     else:

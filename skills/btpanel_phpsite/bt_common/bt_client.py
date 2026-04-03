@@ -70,6 +70,7 @@ class BtClient:
         host: 面板地址
         token: API Token
         timeout: 请求超时时间（毫秒）
+        verify_ssl: 是否验证 SSL 证书
     """
 
     name: str
@@ -77,6 +78,7 @@ class BtClient:
     token: str
     timeout: int = 10000
     enabled: bool = True
+    verify_ssl: bool = True  # 新增：SSL 验证开关
     _session: requests.Session = field(default=None, repr=False, compare=False)  # type: ignore
 
     def __post_init__(self):
@@ -97,8 +99,8 @@ class BtClient:
         self._session.headers.update(
             {"Content-Type": "application/x-www-form-urlencoded"}
         )
-        # 禁用SSL警告（宝塔面板默认使用自签名证书）
-        self._session.verify = False
+        # 设置 SSL 验证（根据配置决定）
+        self._session.verify = self.verify_ssl
 
     def request(self, endpoint: str, params: Optional[dict] = None) -> dict:
         """
@@ -551,6 +553,7 @@ class BtClientManager:
                     host=server["host"],
                     token=server["token"],
                     timeout=server.get("timeout", 10000),
+                    verify_ssl=server.get("verify_ssl", True),  # 传递 SSL 验证配置
                 )
                 self.clients[server["name"]] = client
 
@@ -593,6 +596,7 @@ class BtClientManager:
             host=config["host"],
             token=config["token"],
             timeout=config.get("timeout", 10000),
+            verify_ssl=config.get("verify_ssl", True),  # 传递 SSL 验证配置
         )
         self.clients[config["name"]] = client
         return client

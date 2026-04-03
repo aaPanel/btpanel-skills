@@ -54,6 +54,7 @@ class ServerConfig:
     token: str
     timeout: int = 10000
     enabled: bool = True
+    verify_ssl: bool = True  # 默认启用 SSL 证书验证
 
 
 @dataclass
@@ -75,6 +76,7 @@ class Config:
                     token=s["token"],
                     timeout=s.get("timeout", 10000),
                     enabled=s.get("enabled", True),
+                    verify_ssl=s.get("verify_ssl", True),  # 加载 SSL 验证配置
                 )
             )
 
@@ -138,6 +140,8 @@ servers:
   #   token: "YOUR_API_TOKEN"
   #   timeout: 10000
   #   enabled: true
+  #   verify_ssl: true  # 是否验证 SSL 证书，默认为 true
+  #                     # 如果面板使用自签名证书，设置为 false
 
 global:
   # 请求重试次数
@@ -344,7 +348,7 @@ def validate_host(host: str) -> tuple[bool, str]:
         return False, f"无效的面板地址：{str(e)}"
 
 
-def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: bool = True, config_path: Optional[str] = None) -> bool:
+def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: bool = True, verify_ssl: bool = True, config_path: Optional[str] = None) -> bool:
     """
     添加服务器配置
 
@@ -354,6 +358,7 @@ def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: 
         token: API Token
         timeout: 超时时间
         enabled: 是否启用
+        verify_ssl: 是否验证 SSL 证书
         config_path: 配置文件路径
 
     Returns:
@@ -389,6 +394,7 @@ def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: 
             s["token"] = token
             s["timeout"] = timeout
             s["enabled"] = enabled
+            s["verify_ssl"] = verify_ssl
             break
     else:
         # 添加新配置
@@ -398,6 +404,7 @@ def add_server(name: str, host: str, token: str, timeout: int = 10000, enabled: 
             "token": token,
             "timeout": timeout,
             "enabled": enabled,
+            "verify_ssl": verify_ssl,
         })
 
     config["servers"] = servers
@@ -519,7 +526,7 @@ def get_config_info() -> dict:
             config = load_config(config_path)
             info["server_count"] = len(config.get("servers", []))
             info["servers"] = [
-                {"name": s.get("name"), "host": s.get("host"), "enabled": s.get("enabled", True)}
+                {"name": s.get("name"), "host": s.get("host"), "enabled": s.get("enabled", True), "verify_ssl": s.get("verify_ssl", True)}
                 for s in config.get("servers", [])
             ]
             info["thresholds"] = config.get("global", {}).get("thresholds", {})
