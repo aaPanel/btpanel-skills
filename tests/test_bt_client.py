@@ -110,7 +110,11 @@ class TestBtClient:
         """测试健康检查成功"""
         mock_session = MagicMock()
         mock_response = MagicMock()
-        mock_response.json.return_value = {"status": True, "cpu_usage": 50}
+        mock_response.json.return_value = {
+            "cpu": [50, 2, [30, 20], "Test CPU", 0, 0],
+            "mem": {"memTotal": 2048, "memFree": 1024, "memAvailable": 1024, "memRealUsed": 1024},
+            "disk": [],
+        }
         mock_session.post.return_value = mock_response
         mock_session_class.return_value = mock_session
 
@@ -138,6 +142,36 @@ class TestBtClient:
 
         result = client.health_check()
         assert result is False
+
+    def test_get_system_status_rejects_invalid_payload(self):
+        """测试系统监控接口异常响应会抛错"""
+        client = BtClient(
+            name="test",
+            host="https://example.com:8888",
+            token="test_token",
+        )
+
+        with patch.object(client, "request", return_value={"status": -1, "status_bool": False, "msg": "Invalid action"}):
+            with pytest.raises(RuntimeError, match="Invalid action"):
+                client.get_system_status()
+
+    def test_get_service_status_normalizes_negative_status(self):
+        """测试未安装服务的负数状态不会被视为运行中"""
+        client = BtClient(
+            name="test",
+            host="https://example.com:8888",
+            token="test_token",
+        )
+
+        with patch.object(
+            client,
+            "get_software_info",
+            return_value={"title": "nginx", "version": "", "status": -1, "setup": False, "pid": 0},
+        ):
+            result = client.get_service_status("nginx")
+
+        assert result["installed"] is False
+        assert result["status"] is False
 
 
 class TestBtClientManager:
