@@ -22,6 +22,18 @@ from urllib3.util.retry import Retry
 from .api_endpoints import API_ENDPOINTS, MIN_PANEL_VERSION, get_endpoint
 
 
+def _normalize_panel_flag(value: Any) -> bool:
+    """将宝塔接口中混杂的状态值统一转换为布尔值。"""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value > 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        return normalized in {"1", "true", "running", "run", "开启", "已启动"}
+    return False
+
+
 def sign_request(token: str, params: Optional[dict] = None) -> dict:
     """
     生成API请求签名
@@ -152,7 +164,19 @@ class BtClient:
         Returns:
             原始监控数据
         """
-        return self.request(API_ENDPOINTS["SYSTEM_STATUS"])
+        result = self.request(API_ENDPOINTS["SYSTEM_STATUS"])
+
+        if not isinstance(result, dict):
+            raise RuntimeError("系统监控接口返回格式错误")
+
+        if any(key in result for key in ("cpu", "mem", "disk", "load", "network")):
+            return result
+
+        error_message = result.get("msg") or result.get("message") or result.get("error_msg")
+        if error_message:
+            raise RuntimeError(f"系统监控接口不可用: {error_message}")
+
+        raise RuntimeError("系统监控接口返回无效数据")
 
     def get_service_list(self) -> list:
         """获取服务列表"""
@@ -393,12 +417,14 @@ class BtClient:
         # 标准服务通过软件接口查询
         info = self.get_software_info(service)
         if isinstance(info, dict):
+            installed = _normalize_panel_flag(info.get("setup", False))
+            status = installed and _normalize_panel_flag(info.get("status", False))
             return {
                 "name": service,
                 "title": info.get("title", service),
                 "version": info.get("version", ""),
-                "status": info.get("status", False),
-                "installed": info.get("setup", False),
+                "status": status,
+                "installed": installed,
                 "pid": info.get("pid", 0),
             }
         return {"name": service, "status": False, "installed": False}
