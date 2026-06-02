@@ -351,9 +351,9 @@ def main():
 
     # threshold 命令
     threshold_parser = subparsers.add_parser("threshold", help="设置告警阈值")
-    threshold_parser.add_argument("--cpu", type=int, help="CPU 使用率阈值(%)")
-    threshold_parser.add_argument("--memory", type=int, help="内存使用率阈值(%)")
-    threshold_parser.add_argument("--disk", type=int, help="磁盘使用率阈值(%)")
+    threshold_parser.add_argument("--cpu", type=int, help="CPU 使用率阈值(%%)")
+    threshold_parser.add_argument("--memory", type=int, help="内存使用率阈值(%%)")
+    threshold_parser.add_argument("--disk", type=int, help="磁盘使用率阈值(%%)")
 
     # init 命令
     subparsers.add_parser("init", help="初始化配置文件")

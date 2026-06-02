@@ -467,7 +467,7 @@ def main():
     # access 命令
     access_parser = subparsers.add_parser('access', help='设置数据库访问权限')
     access_parser.add_argument('-d', '--database', required=True, help='数据库名称')
-    access_parser.add_argument('-a', '--access', required=True, help='访问权限（127.0.0.1/%/IP）')
+    access_parser.add_argument('-a', '--access', required=True, help='访问权限（127.0.0.1/%%/IP）')
     access_parser.set_defaults(func=cmd_access)
 
     # tables 命令
