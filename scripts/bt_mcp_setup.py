@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import ssl
 import stat
 import subprocess
 import sys
@@ -24,13 +25,16 @@ import urllib.request
 
 
 INSTALLER_URL = "https://download.bt.cn/bt_mcp_install/btw_mcp_setup.sh"
-INSTALLER_SHA256 = "c9e4186eeff86c94f5b5cad8fb589cfdecc06734a86876d6ac251aacc5256af4"
+INSTALLER_SHA256 = "96995754c50170d0bf4bc8fe93a29dd342b4f00c5d3d0607fcc943d03b8457ab"
 TLS_GUIDE_URL = (
     "https://docs.bt.cn/user-guide/ai/mcp-installation#申请可信-ip-证书"
 )
 RESULT_START = "===BTW_RESULT_START==="
 RESULT_END = "===BTW_RESULT_END==="
 MAX_INSTALLER_BYTES = 2 * 1024 * 1024
+SECRET_VALUE_PATTERN = re.compile(
+    r"(?i)(token|password|passwd|api[ _-]?key|authorization)(\s*[:=]\s*)(\S+)"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -97,7 +101,18 @@ def download_installer() -> tuple[Path, str]:
         INSTALLER_URL,
         headers={"User-Agent": "btpanel-skill-installer/1.0"},
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    tls_context = ssl.create_default_context()
+    if ssl.get_default_verify_paths().cafile is None:
+        try:
+            import certifi
+        except ImportError:
+            pass
+        else:
+            tls_context = ssl.create_default_context(cafile=certifi.where())
+
+    with urllib.request.urlopen(
+        request, timeout=30, context=tls_context
+    ) as response:
         final_url = response.geturl()
         if not final_url.startswith("https://"):
             raise RuntimeError(f"安装入口重定向到非 HTTPS 地址: {final_url}")
@@ -157,12 +172,22 @@ def run_installer(
             command,
             input=path.read_bytes(),
             stdout=subprocess.PIPE,
-            stderr=None,
+            stderr=subprocess.PIPE,
             check=False,
         )
 
     command = ["bash", str(path), *values]
-    return subprocess.run(command, stdout=subprocess.PIPE, stderr=None, check=False)
+    return subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def sanitize_installer_stderr(output: bytes) -> str:
+    text = output.decode("utf-8", errors="replace")
+    return SECRET_VALUE_PATTERN.sub(r"\1\2[REDACTED]", text)
 
 
 def extract_result(output: bytes) -> dict:
@@ -247,6 +272,9 @@ def main() -> int:
         installer_path, actual_hash = download_installer()
         print(f"安装入口校验通过: {actual_hash[:16]}...", file=sys.stderr)
         completed = run_installer(installer_path, args, mcp_host)
+        sanitized_stderr = sanitize_installer_stderr(completed.stderr)
+        if sanitized_stderr:
+            print(sanitized_stderr, file=sys.stderr, end="")
         result = extract_result(completed.stdout)
         classify_binding(result, mcp_host)
         write_result(args.result_file, result)
