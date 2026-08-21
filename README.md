@@ -12,7 +12,19 @@
 
 ## 安装
 
-将仓库克隆到 Agent 的 Skills 目录。以 Codex 为例：
+### 一键安装（推荐）
+
+已安装 Node.js 的用户可以通过 [Skills CLI](https://www.skills.sh/docs/cli) 安装：
+
+```bash
+npx skills add aaPanel/btpanel-skills
+```
+
+CLI 会检测支持的 Agent，并让你选择安装目标和范围。
+
+### 手动安装
+
+也可以将仓库克隆到 Agent 的 Skills 目录。以 Codex 为例：
 
 ```bash
 git clone https://github.com/aaPanel/btpanel-skills.git "$CODEX_HOME/skills/btpanel"
